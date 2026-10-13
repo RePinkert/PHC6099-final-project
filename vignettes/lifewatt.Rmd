@@ -1,0 +1,34 @@
+---
+title: "Introduction to lifewatt"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Introduction to lifewatt}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+## Overview
+
+`lifewatt` maps a US ZIP code to environmental justice indicators:
+
+- average residential electricity price, and its YoY / MoM trend;
+- average life expectancy, and its YoY / MoM trend.
+
+## Planned workflow
+
+```{r eval = FALSE}
+library(lifewatt)
+
+electricity_price("32601")
+electricity_price_trend("32601", period = "yoy")
+
+life_expectancy("32601")
+life_expectancy_trend("32601", period = "mom")
+```
+
+This vignette is a placeholder and will be expanded once the functions are
+implemented.
