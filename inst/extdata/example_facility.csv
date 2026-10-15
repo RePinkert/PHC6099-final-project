@@ -1,0 +1,2 @@
+"facility_id","name","longitude","latitude","address","ai_system_year","coordinate_method","ai_source","address_source","snapshot_date"
+"uf-hipergator-ai","UF HiPerGator AI / East Campus Data Center",-82.298544905125,29.671465784631,"2060 NE WALDO RD, GAINESVILLE, FL, 32609",2021,"Census street-address interpolation; approximate site location","https://news.ufl.edu/2025/05/the-fourth-generation-model-of-ufs-hipergator/","https://explore.jobs.ufl.edu/en-us/job/541158/computer-operator-i","2026-10-14"

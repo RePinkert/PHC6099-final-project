@@ -1,0 +1,140 @@
+---
+title: "lifewatt MVP"
+subtitle: "AI 算力设施周边社区健康探索 · Gainesville 案例"
+output:
+  html_document:
+    self_contained: true
+    theme: flatly
+    toc: true
+    toc_depth: 2
+    number_sections: false
+    highlight: tango
+---
+
+```{r setup, include=FALSE}
+library(lifewatt)
+knitr::opts_chunk$set(echo=FALSE, fig.width=8, fig.height=6, dpi=130,
+                     warning=FALSE, message=FALSE)
+f <- example_facility()
+p <- nearby_communities(f$longitude, f$latitude, radius_km=10)
+all <- community_data()
+```
+
+<style>
+body {color:#223546; font-size:16px; line-height:1.7;}
+.main-container {max-width:1100px;}
+h1,h2 {color:#145e6a;}
+.lead-box {background:#edf6f6;border-left:5px solid #167d8d;padding:18px 22px;margin:22px 0;}
+.note-box {background:#fff7e8;border-left:5px solid #bd8c37;padding:15px 20px;margin:20px 0;}
+table {font-size:14px;}
+pre {font-size:13px;}
+</style>
+
+<div class="lead-box">
+输入一个设施位置，查询周边社区、查看真实健康数据、比较距离分组并导出表格。
+本地快照包含 <strong>`r nrow(all)` 个社区</strong>，全部成功匹配到官方 Census 地区编码；
+以示例地址点为中心，10 公里内选中 <strong>`r nrow(p)` 个社区</strong>。
+</div>
+
+## 这个 MVP 已经做了什么
+
+1. 匹配佛州官方 2020–2024 年社区全因死亡率与死亡人数。
+2. 按设施地址点到 Census 社区内部代表点的球面距离筛选。
+3. 显示社区地图、距离散点图和分组描述表。
+4. 导出 CSV，并保留数据时期、来源和查询坐标。
+5. 将县级寿命背景独立展示。
+
+安装后的示例可离线运行。当前数据只覆盖 Alachua County；函数可以接受其他地点，
+但其他地区需要提供经过核实的同结构社区数据。
+
+## 示例设施与数据时期
+
+```{r facility}
+knitr::kable(data.frame(
+  项目=c("设施", "地址点经度", "地址点纬度", "坐标方法", "AI 系统时期", "社区健康时期", "地理边界"),
+  内容=c(f$name, sprintf("%.5f",f$longitude), sprintf("%.5f",f$latitude),
+         "Census 街道地址插值，非建筑实测坐标", "UF 官方记载 HiPerGator AI 为 2021 年系统",
+         "2020–2024 年合并值", "2020 Census tract")), align=c("l","l"))
+```
+
+<div class="note-box">
+这里展示的是<strong>社区健康背景</strong>。粗死亡率不等于预期寿命，距离不等于污染暴露。
+五年窗口跨过 AI 系统扩建时期，且尚未调整年龄、收入、其他设施和空间相关性；
+图表不能解释为算力中心造成了健康损害或改善。
+</div>
+
+## 社区地图
+
+```{r map, fig.height=6.8}
+plot_communities(p)
+```
+
+星号为近似设施地址点；虚线为查询半径。选择规则采用社区内部代表点，
+社区多边形可能跨过圆圈。灰色背景为未选中的区域；小样本选中区域也显示为灰色。
+颜色仅表示官方公布的粗死亡率，不能作为 AI 风险等级。
+
+## 距离与社区指标
+
+```{r distance, fig.height=5.3}
+plot_communities(p,"distance")
+```
+
+```{r comparison}
+s <- compare_communities(p)
+names(s) <- c("距离区间 km", "社区数", "可用数", "排除数", "社区率中位数", "最小值", "最大值")
+knitr::kable(s, digits=1)
+```
+
+汇总是各社区粗死亡率的**不加权分布**，不是合并人口后的死亡率。
+少于 5 例死亡或死亡人数缺失的社区默认不参与数值汇总。
+全县快照中有 `r sum(all$small_count)` 个小样本社区，原始值仍保留在 CSV 中。
+
+## 最近的社区
+
+```{r nearby}
+cols <- c("geoid","tract","distance_km","death_rate_per_100k","deaths_2020_2024","small_count")
+t <- head(p[cols],12)
+names(t) <- c("GEOID","社区编号","距离 km","粗死亡率 / 10万人","2020–2024 死亡人数","小样本")
+knitr::kable(t,digits=2)
+```
+
+## 县级寿命背景
+
+```{r county}
+c <- county_context()
+knitr::kable(data.frame(地区=c$county, 时期=c$period,
+  预期寿命年=c$life_expectancy_years, 下限=c$lower_95, 上限=c$upper_95))
+```
+
+这项县级指标未复制到社区，也不用于比较设施附近 1 公里与 10 公里的居民寿命。
+
+## 在 RStudio 中复现
+
+```{r code, echo=TRUE, eval=FALSE}
+install.packages("remotes") # 已安装时跳过
+remotes::install_github("RePinkert/PHC6099-final-project",
+                        ref="mvp-community-health", build_vignettes=FALSE)
+library(lifewatt)
+f <- example_facility()
+p <- nearby_communities(f$longitude, f$latitude, radius_km=10)
+plot_communities(p)
+compare_communities(p)
+export_communities(p,"nearby_communities.csv")
+```
+
+安装需要联网，完成后示例可离线运行。把半径改成 3 或 5 可以重新查询。
+当前示例不要求 API key。
+`demo/run_demo.R` 可重新生成 CSV 和图像。
+
+## 来源与下一步
+
+- [佛州卫生部门社区数据](https://www.flhealthcharts.gov/ChartsDashboards/rdPage.aspx?rdReport=ChartsMaps.ChartsMapper)：全因死亡人数与粗死亡率，2020–2024。
+- [Census TIGERweb](https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/6)：2020 社区边界、编码、内部代表点和人口。
+- [佛州县级寿命](https://www.flhealthcharts.gov/ChartsDashboards/rdPage.aspx?rdReport=ChartsMaps.LifeExpectancyReport)：Alachua，2022–2024。
+- [UF 系统发展说明](https://news.ufl.edu/2025/05/the-fourth-generation-model-of-ufs-hipergator/)：AI 设施身份与时期。
+
+下一步优先核实建筑位置、引入适合的年龄和社会经济数据，再考虑其他设施案例。
+目前没有污染测量、AI 因果效应、电价模块或月度寿命趋势。
+
+本地 MVP 的代码与文档使用了 Codex 辅助开发。两位组员需要共同检查数据定义、
+理解各自负责的代码，并在课程报告中透明说明 AI 使用情况。
