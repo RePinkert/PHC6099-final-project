@@ -1,34 +1,92 @@
 ---
-title: "Introduction to lifewatt"
+title: "Exploring community health around an AI computing facility"
 output: rmarkdown::html_vignette
 vignette: >
-  %\VignetteIndexEntry{Introduction to lifewatt}
+  %\VignetteIndexEntry{Exploring community health around an AI computing facility}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
 
-```{r setup, include = FALSE}
-knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
-```
-
-## Overview
-
-`lifewatt` maps a US ZIP code to environmental justice indicators:
-
-- average residential electricity price, and its YoY / MoM trend;
-- average life expectancy, and its YoY / MoM trend.
-
-## Planned workflow
-
-```{r eval = FALSE}
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(collapse=TRUE, comment="#>", fig.width=7, fig.height=5.5)
 library(lifewatt)
-
-electricity_price("32601")
-electricity_price_trend("32601", period = "yoy")
-
-life_expectancy("32601")
-life_expectancy_trend("32601", period = "mom")
 ```
 
-This vignette is a placeholder and will be expanded once the functions are
-implemented.
+This package connects a public facility address to nearby community data. It
+supports descriptive exploration; it does not estimate an effect on lifespan.
+The installed snapshot works offline.
+
+## Query the Gainesville example
+
+```{r query}
+facility <- example_facility()
+facility[c("name", "longitude", "latitude", "coordinate_method")]
+profile <- nearby_communities(facility$longitude, facility$latitude, radius_km=10)
+nrow(profile)
+head(profile[c("geoid", "distance_km", "death_rate_per_100k", "small_count")])
+```
+
+Distance is measured to the 2020 Census internal point of each tract. A tract
+can cross the search circle even if its internal point is inside or outside it.
+The facility point is an approximate street-address interpolation.
+
+## View the selected communities
+
+```{r map}
+plot_communities(profile)
+```
+
+The coloured polygons are selected tracts. Grey background polygons are not
+selected; grey selected tracts have small or unavailable death counts. The
+star is the query point. Colour indicates the official **crude** all-cause
+death rate per 100,000 during 2020-2024, not an AI-related risk score.
+
+## Compare tract distributions
+
+```{r comparisons}
+compare_communities(profile)
+plot_communities(profile, view="distance")
+```
+
+The medians describe an unweighted distribution of tract rates. They are not
+pooled death rates for all residents in a band. Rates with fewer than five
+reported deaths are excluded by default and counted in `n_excluded`.
+Distance bands are descriptive settings, not health-exposure thresholds.
+
+## Keep county life expectancy separate
+
+```{r county}
+county_context()
+```
+
+This county background value uses a different period and geography. It is not
+assigned to tracts. The crude community death rates are not life expectancy.
+
+## Export the rows and reuse the functions
+
+```{r export}
+csv <- tempfile(fileext=".csv")
+export_communities(profile, csv)
+stopifnot(file.exists(csv))
+```
+
+The query accepts other coordinates. To explore another county, supply a
+compatible `communities` data frame containing unique character GEOIDs,
+longitude, latitude, death rates, death counts and a single `health_period`.
+Add source and boundary-vintage columns as in `community_data()`. No national
+data download is implicit. Custom GEOIDs are plotted as points if bundled
+polygons are unavailable.
+
+## Sources and limitations
+
+The inputs come from [Census TIGERweb](https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/6),
+[FLHealthCHARTS](https://www.flhealthcharts.gov/ChartsDashboards/rdPage.aspx?rdReport=ChartsMaps.ChartsMapper)
+and [UF's HiPerGator history](https://news.ufl.edu/2025/05/the-fourth-generation-model-of-ufs-hipergator/).
+The installed `extdata/SOURCES.md` records full provenance and matching rules.
+The 2020-2024 window straddles the 2021 AI-system expansion. Age structure,
+income, migration, other facilities and spatial dependence are not adjusted.
+This single demonstration cannot establish a causal health effect or
+represent every commercial AI data center.
+
+Code and documentation were developed with Codex assistance. Team review,
+understanding and transparent attribution are required before course use.
