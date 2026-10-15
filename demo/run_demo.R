@@ -1,1 +1,15 @@
-
+library(lifewatt)
+args <- commandArgs(trailingOnly = TRUE)
+destination <- if (length(args)) args[1] else "demo"
+dir.create(destination, recursive=TRUE, showWarnings=FALSE)
+f <- example_facility()
+p <- nearby_communities(f$longitude, f$latitude, radius_km=10)
+export_communities(p, file.path(destination, "nearby_communities_10km.csv"), overwrite=TRUE)
+write.csv(compare_communities(p), file.path(destination, "distance_comparison.csv"), row.names=FALSE)
+grDevices::png(file.path(destination, "community_map.png"), width=1500, height=1200, res=170)
+plot_communities(p)
+grDevices::dev.off()
+grDevices::png(file.path(destination, "distance_plot.png"), width=1500, height=1000, res=170)
+plot_communities(p, "distance")
+grDevices::dev.off()
+cat("Selected", nrow(p), "tracts within 10 km; see", destination, "\n")
