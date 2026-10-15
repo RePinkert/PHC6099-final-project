@@ -1,0 +1,21 @@
+{
+  "snapshot_date": "2026-10-14",
+  "health_capture": "Official rendered Rate and Count tables; 58 rows each; filters documented in SOURCES.md",
+  "files": [
+    {
+      "name": "alachua-health-2020-2024.csv",
+      "bytes": 916,
+      "sha256": "53021b01e50153b967494fe7fe6e3e3363727aaddba9348cee2d01073323d1d8"
+    },
+    {
+      "name": "census-tracts-2020.json",
+      "bytes": 1483522,
+      "sha256": "fae5e72973f11e3b1fa0e036abfee26bbca0a963d54548116a3184146c34d424"
+    },
+    {
+      "name": "facility-geocode.json",
+      "bytes": 662,
+      "sha256": "93a8cfe2954009b25725a643819f3d37173fecdfa3b240723266a183f992c6b6"
+    }
+  ]
+}
