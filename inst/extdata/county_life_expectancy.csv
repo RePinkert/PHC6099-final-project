@@ -1,0 +1,2 @@
+"county","county_fips","period","life_expectancy_years","lower_95","upper_95","geography_level","source"
+"Alachua","12001","2022-2024",78.9,78.5,79.2,"County; not a tract outcome","https://www.flhealthcharts.gov/ChartsDashboards/rdPage.aspx?rdReport=ChartsMaps.LifeExpectancyReport"
