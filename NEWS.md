@@ -1,4 +1,6 @@
-# lifewatt 0.0.0.9000
+# lifewatt 0.1.0
 
-* Added the initial package skeleton: `DESCRIPTION`, exported placeholder
-  functions, a testthat setup, a vignette stub, and `README.md`.
+* Added a real 58-tract Alachua County snapshot and source records.
+* Added internal-point distance selection, descriptive comparisons, maps and CSV export.
+* Added small-count flags, geographic-vintage and period metadata, and independent county context.
+* Replaced the original unimplemented query examples with the new community-health workflow.

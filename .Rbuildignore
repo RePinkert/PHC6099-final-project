@@ -1,4 +1,7 @@
+^data-raw$
+^demo$
+^LICENSE\.md$
+^START_HERE\.md$
+^VALIDATION\.md$
 ^.*\.Rproj$
 ^\.Rproj\.user$
-^LICENSE\.md$
-^\.github$
