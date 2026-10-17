@@ -7,10 +7,6 @@ test_that("public functions are exported", {
   expect_true(is.function(life_expectancy_trend))
 })
 
-test_that("placeholders signal that they are not implemented", {
-  expect_error(life_expectancy_trend("32601"))
-})
-
 test_that("electricity_price dispatches to the internal layers", {
   a <- electricity_price("32601", year = 2024)
   expect_equal(a$price, lifewatt:::.zip_annual_price("32601", 2024)$price)
@@ -39,6 +35,17 @@ test_that("life_expectancy: synthetic e0 with provenance + declared assumptions 
   d <- life_expectancy("32601")  # default = latest shipped quarter
   expect_equal(d$quarter, "2025Q3")
   expect_match(d$notes, "outside D2 anchor table", fixed = TRUE)  # 2025 falls back to 2024 anchor
+})
+
+test_that("life_expectancy_trend: yoy/qoq on the quarterly synthesis; mom refused honestly", {
+  ty <- life_expectancy_trend("32601", period = "yoy", quarter = "2024Q4")
+  expect_equal(ty$from_quarter, "2023Q4")
+  expect_equal(ty$e0_change_years, ty$e0_synth_to - ty$e0_synth_from, tolerance = 1e-9)
+  tq <- life_expectancy_trend("32601", period = "qoq", quarter = "2024Q4")
+  expect_equal(tq$from_quarter, "2024Q3")
+  expect_true(tq$provisional)
+  expect_error(life_expectancy_trend("32601", period = "mom"), "should be one of")
+  expect_provenance_cols(ty)
 })
 
 test_that("life_* honest errors", {
