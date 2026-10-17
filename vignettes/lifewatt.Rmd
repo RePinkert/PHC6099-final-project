@@ -47,6 +47,11 @@ my_electricity("32601", bill = 180, usage = 1200, time = "2026-12")
 expected_life_loss("32601", "2026-07")
 expected_life_loss("32601", "2026-12", bill = 180, usage = 1200)
 expected_life_loss("32601", "2026-09", delta_le = 0.01)
+
+# adult health estimates for the ZCTA (CDC PLACES 2025 release, BRFSS 2023;
+# downloaded live from data.cdc.gov on each call)
+health_measure("32601")
+health_measure("32601", measure = c("DIABETES", "BPHIGH"))
 ```
 
 ## Provenance and honesty contract
@@ -56,6 +61,10 @@ Every returned row carries provenance columns (`source`, `level`,
 estimates for the utility territory the OpenEI 2024 mapping assigns to the ZIP.
 Months from 2025-01 onward are provisional and flagged; months after 2026-07
 are served by a validated phase-B triplet forecast (`fit_as_of = 2026-07`).
+`health_measure()` is the exception on provenance *epochs* rather than on
+columns: it is the only interface that is not served from a shipped snapshot, so
+its `provisional` flag is always `FALSE` while the bytes come from a live
+query.
 
 `delta_le` is a declared sensitivity parameter, not a sourced elasticity: the
 output labels it in a `sensitivity_assumption` column. Without `delta_le` the

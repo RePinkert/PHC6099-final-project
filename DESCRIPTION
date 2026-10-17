@@ -12,14 +12,16 @@ Description: Provides ZIP-code-level access to environmental justice
     tables, with any life-expectancy translation declared as a sensitivity
     parameter until a sourced elasticity exists, and a synthetic
     life-expectancy estimate built from state mortality rates whose assumptions
-    are declared in the output.
+    are declared in the output, and ZCTA-level adult health estimates from the
+    CDC PLACES 2025 release (crude prevalence with 95% confidence limits for
+    the 2023 BRFSS measures).
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 Depends:
     R (>= 4.0)
 Suggests:
-    testthat (>= 3.0.0),
+    testthat (>= 3.2.0),
     knitr,
     rmarkdown
 Config/testthat/edition: 3

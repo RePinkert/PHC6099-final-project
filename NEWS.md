@@ -1,6 +1,6 @@
 # lifewatt 0.0.0.9000
 
-* Six public functions replace the placeholder stubs, each released as its own
+* Seven public functions replace the placeholder stubs, each released as its own
   commit on `develop`:
   - `electricity_price()` / `electricity_price_trend()`: the ZIP-level annual
     price (residential-customer-weighted blend of EIA-861 utility prices over the
@@ -22,6 +22,14 @@
     NCHS-published subnational life expectancy. **Breaking:** the trend periods
     are now `"yoy"` and `"qoq"`; `"mom"` is refused, because the mortality source
     is quarterly.
+  - `health_measure()`: ZCTA-level adult health estimates (crude prevalence with
+    95% confidence limits) from the CDC PLACES 2025 release, restricted to the
+    2023 BRFSS measures (the candidate-list E1 rule; the 5 BRFSS-2022 measures
+    are refused). This is the only interface that is **not** served from a
+    shipped `inst/extdata/` snapshot: it queries data.cdc.gov (`qnzd-25i4`) on
+    every call, so it needs the internet and is not reproducible against a
+    frozen vintage. Row counts vary by ZIP because PLACES omits measures
+    suppressed for the ZCTA (at most 35 BRFSS-2023 measures).
 * New shipped data under `inst/extdata/` (B1 monthly cache, phase-B forecast fit,
   OpenEI mapping, EIA-861 annual, NCHS life tables, EIA-112 disconnections, VSRR
   mortality), each reproducible from the assembly scripts in `data-raw/`.

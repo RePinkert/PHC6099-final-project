@@ -13,6 +13,8 @@ test_that("returns only BRFSS 2023 measures with provenance", {
   expect_false(any(c("SLEEP", "DENTAL", "COLON_SCREEN", "MAMMOUSE", "TEETHLOST") %in% r$measure_id))
   expect_equal(unique(r$level), "zcta")
   expect_provenance_cols(r)
+  # PLACES 2025 is a published cross-section, so nothing is provisional
+  expect_false(any(r$provisional))
 })
 
 test_that("diabetes value matches the CDC website (anchor: 32601 = 7.7%)", {
