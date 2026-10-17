@@ -1,6 +1,7 @@
 # phaseB triplet 预测的包内复刻（exp#33）。
-# 契约来源：inst/extdata/price_forecast_fit.rds 的 $contract 字段（与 autoresearch/train.R::predict_fn 逐行等价）；
-# 复刻偏差由 dev-only 回归测试钉死（tests/testthat/test-price-model.R，对账 autoresearch/train.R 注入源码）。
+# 契约来源：inst/extdata/price_forecast_fit.rds 的 $contract 字段（与参考实现 predict_fn 逐行等价）；
+# 复刻偏差由 dev-only 回归测试钉死（tests/testthat/test-price-model.R，对账
+# tests/testthat/fixtures/predict_fn_reference.R —— 该夹具是从研究树冻结出来的唯一副本）。
 # 点 = mean{lag12+12m 漂移(exp#19), 末端水平 v0+b·h, HoltWinters(additive)};
 # 区间 = 漂移口径 origin-sim + horizon 分桶(1..13) + 全州池化 q85（exp#22），n<40 桶退回 obs_max（exp#7）。
 

@@ -117,4 +117,9 @@ but not always, cover the same area; `level = "zcta"` and
   reproducible against a frozen vintage. Freezing it (an `inst/extdata` slim
   snapshot plus a `data-raw/` assembly script) is open work, and the dataset ID
   and `$limit` are hard-coded until then.
-- Model development records live in `autoresearch/` (not shipped in the package).
+- Model development records (the experiment ledger, the research harness and its
+  programme notes) deliberately do **not** live in this repository: the code that
+  produces `inst/extdata/` ships in `data-raw/`, while the research layer around it
+  is kept outside so the package history stays a package history. The one artefact
+  the suite depended on, the reference `predict_fn` used as a 1:1 anchor for
+  `.triplet_predict()`, is frozen under `tests/testthat/fixtures/`.
