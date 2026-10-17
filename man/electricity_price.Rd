@@ -4,22 +4,31 @@
 \alias{electricity_price}
 \title{Average residential electricity price for a ZIP code}
 \usage{
-electricity_price(zip, ...)
+electricity_price(zip, year = NULL, period = NULL)
 }
 \arguments{
 \item{zip}{A character or numeric US ZIP code.}
 
-\item{...}{Reserved for future arguments.}
+\item{year}{A single integer year (2023-2025) for the ZIP-level annual estimate.}
+
+\item{period}{Pass \code{"mom"} for the state-level monthly series of the ZIP (43 rows).}
 }
 \value{
-A data frame with the ZIP code and the average electricity price.
+A data.frame with the price (cents/kWh) and provenance columns
+(source/level/degraded_from/mapping_vintage/provisional); one row for the annual
+regime, 43 rows for the monthly series.
 }
 \description{
-Returns the area-average residential electricity price (USD per kWh) for a
-US ZIP code.
+Returns the residential electricity price estimate for the utility territory a US
+ZIP code belongs to. The annual ZIP-level estimate is a residential-customer-weighted
+blend of EIA-861 utility prices (final releases 2023-2025) over the utilities the
+OpenEI 2024 mapping assigns to the ZIP. The monthly series is the B1 state-level
+retail-sales cache (2023-01 to 2026-07); months from 2025-01 onward are provisional
+and flagged.
 }
 \examples{
 \dontrun{
-electricity_price("32601")
+electricity_price("32601", year = 2024)
+electricity_price("32601", period = "mom")
 }
 }
