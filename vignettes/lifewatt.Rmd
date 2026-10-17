@@ -17,8 +17,8 @@ knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
 
 This branch is released one public function at a time. Right now it ships the
 electricity price accessor, its trend wrapper, the expected life-expectancy loss
-view and the bill-evidence view; the synthetic life-expectancy estimate arrives
-in a later slice.
+view, the bill-evidence view and the synthetic life-expectancy estimate;
+`life_expectancy_trend()` arrives in the next slice.
 
 ## Workflow
 
@@ -43,6 +43,10 @@ my_electricity("32601", bill = 180, usage = 1200, time = "2026-12")
 expected_life_loss("32601", "2026-07")
 expected_life_loss("32601", "2026-12", bill = 180, usage = 1200)
 expected_life_loss("32601", "2026-09", delta_le = 0.01)
+
+# synthetic life expectancy
+life_expectancy("32601")
+life_expectancy("32601", quarter = "2024Q4")
 ```
 
 ## Provenance and honesty contract
@@ -58,3 +62,9 @@ forecast (`fit_as_of = 2026-07`).
 `delta_le` is a declared sensitivity parameter, not a sourced elasticity: the
 output labels it in a `sensitivity_assumption` column and withholds the loss
 columns when it is absent. Without `delta_le` the life-loss columns are NA.
+
+`life_expectancy()` returns a **synthetic** estimate: state mortality rates
+(NCHS VSRR provisional) applied to the national age pattern and anchored to the
+published NCHS e0. Every assumption is declared in `sensitivity_assumption`, and
+the `estimate_type` label states that this is not an NCHS-published subnational
+life expectancy.

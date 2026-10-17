@@ -2,23 +2,34 @@
 % Please edit documentation in R/life-expectancy.R
 \name{life_expectancy}
 \alias{life_expectancy}
-\title{Average life expectancy for a ZIP code}
+\title{Synthetic life expectancy for a ZIP code}
 \usage{
-life_expectancy(zip, ...)
+life_expectancy(zip, quarter = NULL)
 }
 \arguments{
 \item{zip}{A character or numeric US ZIP code.}
 
-\item{...}{Reserved for future arguments.}
+\item{quarter}{A quarter ("YYYY-Qn"); default: the latest VSRR quarter shipped.}
 }
 \value{
-A data frame with the ZIP code and the average life expectancy.
+A one-row data.frame with \code{e0_synth}, \code{e0_anchor} (NCHS national),
+\code{delta_e1}, the state mortality index \code{m_index}, premature-mortality metrics
+(\code{ypll75_per_1k}, \code{prop_died_before_75}), an \code{estimate_type} label and full
+provenance columns (source/level/degraded_from/mapping_vintage/provisional)
+plus the \code{sensitivity_assumption} declaration.
 }
 \description{
-Returns the average life expectancy (years) for a US ZIP code.
+Returns a \strong{synthetic} life-expectancy estimate for the state the ZIP belongs
+to: the D1b/D2 sensitivity synthesis (internal mortality-synth layer) — the
+state's mortality index (VSRR age-adjusted rate vs US) applied to the national
+age pattern, converted through an abridged life table and anchored to the
+published NCHS national e0. This is a declared-assumption estimate, \strong{not} an
+NCHS-published subnational life expectancy; every assumption travels in the
+\code{sensitivity_assumption} column (estimate_type says "synthetic_e0").
 }
 \examples{
 \dontrun{
 life_expectancy("32601")
+life_expectancy("32601", quarter = "2024Q4")
 }
 }

@@ -103,6 +103,9 @@ test_that("scenario 9: 讲不通的输入会被指名拒绝（快照锁定用户
   expect_snapshot(
     tryCatch(expected_life_loss(anchor_zip_fl, "2026-12", bill = -3), error = function(e) e)$message
   )
+  expect_snapshot(
+    tryCatch(life_expectancy(anchor_zip_fl, quarter = "2024-06"), error = function(e) e)$message
+  )
   # 无 year/period 直接调用：mock 意向下必须有指路信息
   expect_snapshot(
     tryCatch(electricity_price(anchor_zip_fl), error = function(e) e)$message
