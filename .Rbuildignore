@@ -3,3 +3,7 @@
 ^LICENSE\.md$
 ^\.github$
 ^docs$
+^data-raw$
+^autoresearch$
+^results\.tsv$
+^\.git$

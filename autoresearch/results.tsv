@@ -1,0 +1,27 @@
+commit	mase	bad_coverage	status	description
+3fdb49c	1.000000	0.492760	baseline	seasonal-naive lag12 + global MAD*1.0 (coverage too narrow)
+f26d07f→5dd29b9	1.000000	0.280090	keep	conformal per-state q90/1.645: coverage .41→.62; program advance-rule fixed to lexicographic
+5dd29b9→e1fc810	0.786939	0.287632	keep	drift-corrected seasonal naive (24m per-state slope); coverage band noise-tolerant
+3fdd	0.786939	0.381146	discard	train-recent-12m conformal inflation: ratio<1 shrank intervals (test-period regime drift not visible in-train)
+e1fc810→a89944e	0.786939	0.138311	keep	pooled (51-state) conformal q90: per-state bins too thin
+e1fc8102→ee52a6200d	0.786939	0.088537	keep	horizon-binned origin-sim conformal
+2a6200d→557d779	0.786939	0.004072	keep	tail-monotone sparse-bin q90 -> gate passed
+557d779→disc	0.796464	0.191101	discard	pure HoltWinters: worse on both axes; 43 monthly obs too few for ETS season fit
+557d779→3cf80f0	0.647341	0.029110	keep	ensemble HW+drift
+	0.666317	0.046305	discard	in-sample lam sweep: picked lam!=0.5, worse on test; 43-month sample too thin for weight tuning
+803d151→disc	0.793007	0.037255	discard	dual-anchor lost HW blend gain; HW was the strongest member
+803d151→disc	0.671890	0.046305	discard	median-of-3 loses to mean HW+drift .647
+803d151→disc	0.653691	0.029110	discard	0.4HW/0.6drift (best .647 at 50/50)
+add	0.656401	0.029110	discard	0.6HW/0.4drift .656 (50/50 locally optimal)
+3092a42→	0.644583	0.027602	keep	HW additive season: tiny but real, zero added complexity
+3092a42→	0.684742	0.003469	discard	beta=TRUE worse mase
+3092a42→	0.644583	0.043288	discard	blend-reanchored interval: no gain
+aa52189→	0.602329	0.057768	keep	drift window 24->12: big mase gain; coverage over ceiling -> next exp must refold
+aa52189→	0.639347	0.115686	discard	18m window: worse both
+aa52189→	0.776039	0.035143	discard	9m window worse
+6bdadac→	0.602329	0.018552	keep	q85 intervals: gate refold, mase preserved. phase-A best
+6bdadac→	0.605759	0.017044	discard	log-HW no gain
+7acd6c7→	0.596580	0.014027	keep	triple mean ensemble: last-level anchor adds value
+7acd6c7→	0.615785	0.011011	discard	quad-dilution worse than triple .5966
+fc83991→	0.596580	0.014027	keep	mase bootstrap CI artifact
+fc83991→	0.596580	0.023680	discard	re-anchor to triple: coverage loses nominal proximity
