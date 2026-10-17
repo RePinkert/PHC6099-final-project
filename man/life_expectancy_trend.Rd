@@ -2,26 +2,31 @@
 % Please edit documentation in R/life-expectancy-trend.R
 \name{life_expectancy_trend}
 \alias{life_expectancy_trend}
-\title{Change in life expectancy over time}
+\title{Change in synthetic life expectancy over time}
 \usage{
-life_expectancy_trend(zip, period = c("yoy", "mom"), ...)
+life_expectancy_trend(zip, period = c("yoy", "qoq"), quarter = NULL)
 }
 \arguments{
 \item{zip}{A character or numeric US ZIP code.}
 
-\item{period}{One of \code{"yoy"} (year over year) or \code{"mom"} (month over month).}
+\item{period}{One of \code{"yoy"} or \code{"qoq"}.}
 
-\item{...}{Reserved for future arguments.}
+\item{quarter}{A quarter ("YYYY-Qn"); default: the latest VSRR quarter shipped.}
 }
 \value{
-A data frame with the ZIP code and the requested trend.
+A one-row data.frame with the from/to synthetic e0 values, their
+change (years and mortality-rate terms) and full provenance plus the
+\code{sensitivity_assumption} declaration.
 }
 \description{
-Returns the period-over-period change in average life expectancy for a US
-ZIP code.
+Quarter-over-period change in the \code{\link[=life_expectancy]{life_expectancy()}} synthetic estimate:
+\code{period = "yoy"} compares the same quarter a year earlier, \code{"qoq"} the
+previous quarter (the VSRR source is quarterly — the placeholder \code{"mom"}
+period is not available and is refused honestly).
 }
 \examples{
 \dontrun{
 life_expectancy_trend("32601", period = "yoy")
+life_expectancy_trend("32601", period = "qoq")
 }
 }
