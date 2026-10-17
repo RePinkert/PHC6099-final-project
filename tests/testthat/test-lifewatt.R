@@ -8,7 +8,6 @@ test_that("public functions are exported", {
 })
 
 test_that("placeholders signal that they are not implemented", {
-  expect_error(life_expectancy("32601"))
   expect_error(life_expectancy_trend("32601"))
 })
 
@@ -26,6 +25,26 @@ test_that("electricity_price honest errors", {
   expect_error(electricity_price("32601"), "Provide either year", fixed = TRUE)
   expect_error(electricity_price("32601", year = 2024, period = "mom"), "not both", fixed = TRUE)
   expect_error(electricity_price("32601", period = "momx"), "Unknown period", fixed = TRUE)
+})
+
+test_that("life_expectancy: synthetic e0 with provenance + declared assumptions (exp#43)", {
+  r <- life_expectancy("32601", quarter = "2024Q4")
+  expect_equal(r$state, "FL")
+  expect_equal(r$e0_synth, lifewatt:::.le_synth("FL", "2024Q4", "12m")$e0_synth, tolerance = 1e-9)
+  expect_equal(r$e0_anchor, 79.0)
+  expect_match(r$estimate_type, "synthetic_e0", fixed = TRUE)
+  expect_match(r$estimate_type, "not an NCHS-published subnational life expectancy", fixed = TRUE)
+  expect_match(r$sensitivity_assumption, "DECLARED assumption", fixed = TRUE)
+  expect_provenance_cols(r)
+  d <- life_expectancy("32601")  # default = latest shipped quarter
+  expect_equal(d$quarter, "2025Q3")
+  expect_match(d$notes, "outside D2 anchor table", fixed = TRUE)  # 2025 falls back to 2024 anchor
+})
+
+test_that("life_* honest errors", {
+  expect_error(life_expectancy("99999"), "No electric utility record", fixed = TRUE)
+  expect_error(life_expectancy("32601", quarter = "2024-06"), "Invalid quarter", fixed = TRUE)
+  expect_error(life_expectancy("32601", quarter = "2022Q4"), "window 2023Q1..2025Q3", fixed = TRUE)
 })
 
 test_that("trend wrappers: yoy uses A1 diffs, mom uses B1 diffs", {
