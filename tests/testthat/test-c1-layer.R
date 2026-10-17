@@ -45,3 +45,13 @@ test_that("expected_life_loss wires C1 NA outside 2024 with note", {
   expect_true(is.na(r$c1_disconnections_per_1k))
   expect_match(r$notes, "C1 mechanism not available at 2026-07", fixed = TRUE)
 })
+
+test_that("my_electricity mirrors the C1 wiring (energy-side sibling)", {
+  r <- my_electricity("32601", bill = 150, time = "2024-06")
+  expect_equal(r$c1_disconnections_per_1k, 16.54101247, tolerance = 1e-6)
+  expect_true(grepl("Form EIA-112 State Total", r$c1_source))
+  expect_false(grepl("LE|life", r$notes))
+  r2 <- my_electricity("32601", time = "2026-12")
+  expect_true(is.na(r2$c1_disconnections_per_1k))
+  expect_match(r2$notes, "C1 mechanism not available at 2026-12", fixed = TRUE)
+})

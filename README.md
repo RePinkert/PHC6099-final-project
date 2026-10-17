@@ -36,6 +36,10 @@ electricity_price_trend("32601", period = "mom")
 expected_life_loss("32601", "2026-07")
 expected_life_loss("32601", "2026-12", bill = 180, usage = 1200)
 expected_life_loss("32601", "2026-09", delta_le = 0.01)
+
+# price at a time point + bill as Bayesian evidence
+my_electricity("32601", bill = 180, time = "2026-12")
+my_electricity("32601", bill = 180, usage = 1200, time = "2026-12")
 ```
 
 Every row carries provenance columns (`source`, `level`, `degraded_from`,
@@ -59,9 +63,11 @@ A bill is treated as evidence, not as an input you owe: on its own it yields
 implied usage; with usage it forms a local price measurement that tightens the
 forecast's interval. EIA-112 disconnection rates ride along for 2024.
 
-The bill-evidence view (`my_electricity`) and the synthetic life-expectancy
-estimate (`life_expectancy`, `life_expectancy_trend`) land in later slices of
-this distribution.
+The synthetic life-expectancy estimate (`life_expectancy`,
+`life_expectancy_trend`) lands in later slices of this distribution.
+
+`my_electricity()` is the same engine without the life columns: if you only want
+the energy picture, nothing about the elasticity contract leaks into it.
 
 ## Scope notes
 
