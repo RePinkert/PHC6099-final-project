@@ -1,0 +1,3 @@
+# The forecast experiment ledger is append-only historical evidence: normalise its
+# line endings so appending a row cannot turn the whole file into a diff.
+autoresearch/results.tsv text eol=lf
