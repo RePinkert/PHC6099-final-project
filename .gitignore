@@ -2,3 +2,8 @@
 .Rhistory
 .RData
 .Ruserdata
+data-raw/eia_json/
+autoresearch/run.log
+data-raw/eia861/
+data-raw/eia112/
+data-raw/vsrr/
