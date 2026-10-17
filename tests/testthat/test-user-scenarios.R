@@ -120,3 +120,60 @@ test_that("scenario 10: my_electricity 与正门同引擎、能源侧无 LE 列"
   expect_false(any(grepl("^le_loss|e0_anchor", names(a))))
   expect_provenance_cols(a)
 })
+test_that("scenario 11: 健康侧查糖尿病与高血压（ZCTA 原生，带 95% CI）", {
+  local_mocked_bindings(.places_fetch = read_places_fixture)
+  r <- health_measure(anchor_zip_fl, measure = c("DIABETES", "BPHIGH"))
+  expect_setequal(r$measure_id, c("DIABETES", "BPHIGH"))
+  dm <- r[r$measure_id == "DIABETES", ]
+  expect_equal(dm$value, anchor_health_diabetes_value)
+  expect_equal(dm$low_ci, anchor_health_diabetes_low)
+  expect_equal(dm$high_ci, anchor_health_diabetes_high)
+  expect_lt(dm$low_ci, dm$value)
+  expect_lt(dm$value, dm$high_ci)
+  bp <- r[r$measure_id == "BPHIGH", ]
+  expect_equal(bp$value, anchor_health_bphigh_value)
+  expect_equal(bp$low_ci, anchor_health_bphigh_low)
+  expect_equal(bp$high_ci, anchor_health_bphigh_high)
+  expect_equal(unique(r$unit), "%")
+  expect_equal(unique(r$value_type), "Crude prevalence")
+  expect_equal(unique(r$brfss_year), 2023L)
+  expect_equal(unique(r$level), "zcta")
+  expect_equal(unique(r$degraded_from), "zip")   # ZIP -> 同五位 ZCTA，必须随行声明
+  expect_false(any(r$provisional))               # 已发布横截面，不是暂定 vintage
+  expect_provenance_cols(r)
+  expect_snapshot(print(r[, c("zip", "measure_id", "measure", "value", "low_ci", "high_ci")]))
+})
+
+test_that("scenario 12: measure = NULL 返回该 ZCTA 实有项（抑制项缺席，不补洞）", {
+  local_mocked_bindings(.places_fetch = read_places_fixture)
+  r <- health_measure(anchor_zip_fl)
+  expect_equal(nrow(r), anchor_health_n_measures_fl)
+  expect_lte(nrow(r), anchor_health_n_measures_max)
+  expect_equal(anyDuplicated(r$measure_id), 0L)
+  expect_true(all(r$brfss_year == 2023L))
+  # E1 规则：5 项 BRFSS-2022 指标一律不出现
+  expect_false(any(c("COLON_SCREEN", "DENTAL", "MAMMOUSE", "SLEEP", "TEETHLOST") %in% r$measure_id))
+  # 排序 = category 字典序内嵌 measure_id，用户可稳定 diff
+  expect_identical(r$category, sort(r$category))
+  expect_equal(sort(unique(r$category)),
+               c("Disability", "Health Outcomes", "Health Risk Behaviors",
+                 "Health Status", "Prevention"))
+})
+
+test_that("scenario 13: 抑制项与拼错 ID 报同一个错，坏 ZIP 各自指名", {
+  local_mocked_bindings(.places_fetch = read_places_fixture)
+  expect_error(health_measure(anchor_zip_fl, measure = "NOPE"),
+               "Measure(s) not available", fixed = TRUE)
+  # SLEEP 是全国口径存在的指标，但被 32601 抑制 -> 在响应里真的没有这一行，
+  # 因此与拼错 ID 报同一个错；这不是 bug，而是 PLACES 的抑制语义。
+  expect_error(health_measure(anchor_zip_fl, measure = "SLEEP"), "not available", fixed = TRUE)
+  # 大写化后再校验，用户写 "diabetes" 不该报错
+  expect_equal(health_measure(anchor_zip_fl, measure = "diabetes")$measure_id, "DIABETES")
+  # ZIP 归一化边界：ZIP+4 与 4 位写法
+  expect_equal(health_measure(paste0(anchor_zip_fl, "-4401"))$zip[1], anchor_zip_fl)
+  expect_equal(health_measure("1002")$zip[1], "01002")
+  # 用户可见报错文本快照
+  expect_snapshot(tryCatch(health_measure("abcde"), error = function(e) e)$message)
+  local_mocked_bindings(.places_fetch = function(zip5) read_places_fixture(zip5)[0, ])
+  expect_snapshot(tryCatch(health_measure("99999"), error = function(e) e)$message)
+})
