@@ -16,7 +16,7 @@ knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
 `lifewatt` maps a US ZIP code to environmental justice indicators.
 
 This branch is released one public function at a time. Right now it ships the
-electricity price accessor; the trend wrapper, the bill-evidence view, the
+electricity price accessor and its trend wrapper; the bill-evidence view, the
 expected life-expectancy loss view and the synthetic life-expectancy estimate
 arrive in later slices.
 
@@ -30,6 +30,10 @@ electricity_price("32601", year = 2024)
 
 # state monthly series (2023-01 .. 2026-07; 2025+ provisional flags)
 electricity_price("32601", period = "mom")
+
+# trends
+electricity_price_trend("32601", period = "yoy")
+electricity_price_trend("32601", period = "mom")
 ```
 
 ## Provenance and honesty contract

@@ -4,24 +4,25 @@
 \alias{electricity_price_trend}
 \title{Change in average electricity price over time}
 \usage{
-electricity_price_trend(zip, period = c("yoy", "mom"), ...)
+electricity_price_trend(zip, period = c("yoy", "mom"))
 }
 \arguments{
 \item{zip}{A character or numeric US ZIP code.}
 
-\item{period}{One of \code{"yoy"} (year over year) or \code{"mom"} (month over month).}
-
-\item{...}{Reserved for future arguments.}
+\item{period}{One of \code{"yoy"} or \code{"mom"}.}
 }
 \value{
-A data frame with the ZIP code and the requested trend.
+A data.frame with the change (cents/kWh) and provenance columns. Positive
+change = price increase; negative = decrease.
 }
 \description{
-Returns the period-over-period change in the average residential electricity
-price for a US ZIP code.
+Year-over-year change of the customer-weighted ZIP-level annual price (EIA-861,
+2024 and 2025 rows), or month-over-month change of the B1 state-level monthly series
+(42 rows; a flagged provisional change involves at least one provisional month).
 }
 \examples{
 \dontrun{
 electricity_price_trend("32601", period = "yoy")
+electricity_price_trend("32601", period = "mom")
 }
 }
