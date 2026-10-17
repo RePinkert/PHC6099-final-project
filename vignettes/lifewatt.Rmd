@@ -16,8 +16,8 @@ knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
 `lifewatt` maps a US ZIP code to environmental justice indicators.
 
 This branch is released one public function at a time. Right now it ships the
-electricity price accessor and its trend wrapper; the bill-evidence view, the
-expected life-expectancy loss view and the synthetic life-expectancy estimate
+electricity price accessor, its trend wrapper and the expected life-expectancy
+loss view; the bill-evidence view and the synthetic life-expectancy estimate
 arrive in later slices.
 
 ## Workflow
@@ -34,6 +34,11 @@ electricity_price("32601", period = "mom")
 # trends
 electricity_price_trend("32601", period = "yoy")
 electricity_price_trend("32601", period = "mom")
+
+# expected life-expectancy loss view
+expected_life_loss("32601", "2026-07")
+expected_life_loss("32601", "2026-12", bill = 180, usage = 1200)
+expected_life_loss("32601", "2026-09", delta_le = 0.01)
 ```
 
 ## Provenance and honesty contract
@@ -43,4 +48,9 @@ Every returned row carries provenance columns (`source`, `level`,
 estimates for the utility territory the OpenEI 2024 mapping assigns to the ZIP.
 The annual figure is a residential-customer-weighted blend of EIA-861 utility
 prices over the mapped utilities; months from 2025-01 onward are provisional and
-flagged.
+flagged; months after 2026-07 are served by a validated phase-B triplet
+forecast (`fit_as_of = 2026-07`).
+
+`delta_le` is a declared sensitivity parameter, not a sourced elasticity: the
+output labels it in a `sensitivity_assumption` column and withholds the loss
+columns when it is absent. Without `delta_le` the life-loss columns are NA.
