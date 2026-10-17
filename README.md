@@ -45,6 +45,8 @@ my_electricity("32601", bill = 180, usage = 1200, time = "2026-12")
 # estimate_type labels it -- not an NCHS-published subnational value)
 life_expectancy("32601")
 life_expectancy("32601", quarter = "2024Q4")
+life_expectancy_trend("32601", period = "yoy")
+life_expectancy_trend("32601", period = "qoq")
 ```
 
 Every row carries provenance columns (`source`, `level`, `degraded_from`,
@@ -68,8 +70,10 @@ A bill is treated as evidence, not as an input you owe: on its own it yields
 implied usage; with usage it forms a local price measurement that tightens the
 forecast's interval. EIA-112 disconnection rates ride along for 2024.
 
-The synthetic life-expectancy estimate (`life_expectancy_trend`) lands in the
-next slice.
+`life_expectancy_trend()` reports quarter-over-period change on the same
+synthesis. Its periods are `"yoy"` and `"qoq"`, because the mortality source is
+quarterly: **`"mom"` is refused** rather than approximated into something the
+data cannot support.
 
 `my_electricity()` is the same engine without the life columns: if you only want
 the energy picture, nothing about the elasticity contract leaks into it.
@@ -88,9 +92,8 @@ row.
 
 ## Scope notes
 
-- `life_expectancy_trend()` is still a stub on this branch and refuses to run.
-- The mortality source is quarterly, so its trend periods will be `"yoy"` /
-  `"qoq"`; `"mom"` does not exist for it.
+- The mortality source is quarterly, so the life-expectancy trend periods are
+  `"yoy"` / `"qoq"`; `"mom"` is refused honestly.
 - EIA-112 disconnection data covers 2024 only; outside that window the columns
   are NA with a note saying so.
 - Model development records live in `autoresearch/` (not shipped in the package).
