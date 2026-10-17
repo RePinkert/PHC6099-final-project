@@ -1,0 +1,1553 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>lifewatt 数据源 DAG —— 实装流水线 × 规划数据面 × 包接口</title>
+<style>
+  :root{
+    --ink:#263238; --ink2:#546E7A; --line:#B0BEC5;
+    --impl:#E3F2FD; --impl-b:#1565C0;
+    --ephem:#ECEFF1; --ephem-b:#78909C;
+    --plan:#FFF8E1; --plan-b:#EF6C00;
+    --stub:#FFEBEE; --stub-b:#C62828;
+    --contract:#F3E5F5; --contract-b:#6A1B9A;
+    --input:#EDE7F6; --input-b:#4527A0;
+    --gap:#FFF3E0; --gap-b:#E65100;
+    --barr:#FFEBEE; --barr-b:#B71C1C;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#FAFAFA;color:var(--ink);
+    font-family:'Microsoft YaHei','PingFang SC','Segoe UI',system-ui,sans-serif;line-height:1.65}
+  main{max-width:1280px;margin:0 auto;padding:28px 24px 72px}
+  header h1{font-size:24px;color:#1A237E;margin:8px 0 10px}
+  .meta{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 16px;font-size:12.5px;color:var(--ink2)}
+  .meta p{margin:4px 0}
+  section{margin-top:34px}
+  h2{font-size:18px;border-left:4px solid #1A237E;padding-left:10px;margin:0 0 12px}
+  h3{font-size:14.5px;color:#37474F;letter-spacing:1px;margin:0 0 10px}
+
+  .diagram-wrap{background:#fff;border:1px solid var(--line);border-radius:12px;padding:18px 18px 12px;overflow-x:auto}
+  .diagram{position:relative;min-width:1020px;padding:6px 4px 30px}
+  #edgeLayer{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1;overflow:visible}
+  #edgeLayer .halo{fill:none;stroke:#FFFFFF;opacity:calc(var(--o,1) * .92)}
+
+  .band{--bh:#1565C0;--bh-bg:#E9F1F8;--bh-line:#C9DAEA;
+    position:relative;background:#F7FAFC;border:1px solid var(--bh-line);border-radius:14px;
+    padding:0 20px 30px;margin:0}
+  .band + .band{margin-top:48px}
+  .band:first-of-type{margin-top:10px}
+  .band[data-band="1"]{--bh:#EF6C00;--bh-bg:#FDF3E3;--bh-line:#F1DCC0}
+  .band[data-band="2"]{--bh:#2E7D32;--bh-bg:#EAF4EB;--bh-line:#C9DFCC}
+  .band > h3{display:flex;align-items:center;gap:9px;margin:0 -20px 16px;padding:9px 20px 8px;
+    background:var(--bh-bg);border-bottom:1px solid var(--bh-line);border-radius:13px 13px 0 0;
+    font-size:14px;letter-spacing:.4px;color:var(--bh);position:relative;z-index:5;
+    cursor:pointer;user-select:none}
+  .band > h3:hover{filter:brightness(.97)}
+  .band > h3 .bh-i{flex:none;width:20px;height:20px;border-radius:6px;background:var(--bh);color:#fff;
+    font-size:12px;display:flex;align-items:center;justify-content:center}
+  .band > h3 .bh-t{flex:1 1 auto}
+  .band > h3 .bh-meta{flex:none;font-size:11px;font-weight:600;color:var(--ink2);letter-spacing:0;
+    background:#FFFFFF;border:1px solid var(--bh-line);border-radius:20px;padding:1px 9px}
+  .band>h3,.group h4,.barrier{position:relative;z-index:5}
+  .band-h4{position:relative;z-index:5;display:flex;align-items:center;gap:7px;width:100%;
+    margin:2px 0;font-size:12px;letter-spacing:.5px;color:var(--ink2);font-weight:600}
+  .band-h4::before{content:"";flex:none;width:12px;height:2px;border-radius:1px;background:var(--line)}
+  .edge-hint{position:absolute;display:none;z-index:9;background:#263238;color:#fff;border-radius:7px;
+    padding:5px 9px;font-size:11.5px;line-height:1.35;max-width:380px;box-shadow:0 3px 10px rgba(0,0,0,.28);
+    pointer-events:none}
+  .row{display:flex;flex-wrap:wrap;gap:26px 34px;align-items:flex-start;margin:14px 0}
+  .split{display:flex;flex-direction:column;gap:2px;max-width:280px}
+  .barrier{display:flex;align-items:center;gap:8px;color:var(--barr-b);font-size:11px;font-weight:600;white-space:nowrap;margin:4px 0}
+  .barrier::before,.barrier::after{content:"";flex:1;border-top:2px dashed var(--barr-b)}
+  .groups{display:flex;flex-wrap:wrap;gap:22px 44px;align-items:flex-start}
+  .group{background:#FBFCFE;border-radius:12px;padding:10px 14px 12px;display:flex;flex-direction:column;gap:12px;min-width:250px}
+  #grp-decision{margin-left:96px}
+  .group h4{display:flex;align-items:center;gap:7px;margin:0;font-size:12px;color:var(--ink2);font-weight:600;letter-spacing:.5px}
+  .group h4::before{content:"";flex:none;width:12px;height:2px;border-radius:1px;background:var(--line)}
+  .grow{display:flex;flex-wrap:wrap;gap:14px 18px;align-items:flex-start}
+
+  .card{position:relative;background:#fff;border:1.8px solid var(--impl-b);border-radius:10px;
+    padding:9px 13px 10px;min-width:150px;max-width:250px;font-size:13px;z-index:4;transition:box-shadow .15s,transform .15s}
+  .card .t{font-weight:700;font-size:13.5px;line-height:1.35}
+  .card .s{color:var(--ink2);font-size:11px;line-height:1.5;margin-top:3px}
+  .card .badge{position:absolute;top:6px;right:8px;font-size:10px;font-weight:700}
+  .card .badge + .t{padding-right:44px}
+  .card:hover{box-shadow:0 4px 14px rgba(26,35,126,.18)}
+  .c-env{background:#fff;border-color:#546E7A}
+  .c-impl{background:var(--impl);border-color:var(--impl-b)}
+  .c-ephem{background:var(--ephem);border-color:var(--ephem-b);border-style:dashed}
+  .c-plan{background:var(--plan);border-color:var(--plan-b);border-style:dashed}
+  .c-plan .badge{color:var(--plan-b)}
+  .c-stub{background:var(--stub);border-color:var(--stub-b)}
+  .c-contract{background:var(--contract);border-color:var(--contract-b);border-style:dashed}
+  .c-input{background:var(--input);border-color:var(--input-b)}
+  .c-gap{background:var(--gap);border-color:var(--gap-b);border-style:dotted}
+  .c-gap .badge{color:var(--gap-b)}
+  .c-barr{background:var(--barr);border-color:var(--barr-b);border-style:dashed}
+  .wide{max-width:340px}
+  .card.hl{outline:3px solid #1A237E;outline-offset:2px}
+
+  #edgeLayer .edge{--o:1;opacity:var(--o);transition:opacity .18s}
+  .diagram.trunk-only #edgeLayer .edge:not(.trunk){--o:.14}
+  .diagram.focusing #edgeLayer .edge{--o:.07}
+  .diagram.focusing #edgeLayer .edge.on{--o:1}
+  .diagram.focusing #edgeLayer text:not(.on){opacity:0}
+  #edgeLayer text.edge{font-family:'Microsoft YaHei','PingFang SC',sans-serif;opacity:0;transition:opacity .18s}
+  .diagram.labels-on #edgeLayer text{opacity:1}
+  .diagram.band-focus .band:not(.on){background:#F1F3F5}
+  .diagram.band-focus .band:not(.on) > h3,
+  .diagram.band-focus .band:not(.on) .group h4,
+  .diagram.band-focus .band:not(.on) .band-h4,
+  .diagram.band-focus .band:not(.on) .card,
+  .diagram.band-focus .band:not(.on) .barrier{opacity:.26}
+  .diagram.band-focus #edgeLayer .edge:not(.on){--o:.05}
+  .diagram.band-focus #edgeLayer text:not(.on){opacity:0}
+
+  .legend{display:flex;flex-wrap:wrap;gap:10px 26px;align-items:center;margin-top:16px;padding:12px 14px;
+    background:#fff;border:1px solid var(--line);border-radius:10px;font-size:11.5px;color:#37474F}
+  .lg{display:flex;align-items:center;gap:7px}
+  .sw{width:22px;height:14px;border-radius:4px;border:1.6px solid #999}
+  .ln{width:34px;height:0;border-top:2.5px solid #1565C0}
+  .ln.dash{border-top-style:dashed;border-color:var(--plan-b)}
+  .ln.dot{border-top-style:dotted;border-color:var(--gap-b)}
+  .ln.reuse{border-top-style:dotted;border-color:var(--ephem-b)}
+  .ln.barr{border-top-style:dashed;border-color:var(--barr-b)}
+  .ln.trunk{border-top-width:3.4px;border-color:#1565C0;box-shadow:0 0 0 1.5px #fff,0 0 0 2.5px #DCE6EE}
+  .ln.inner{border-top-width:1.4px;border-color:#1565C0;opacity:.45}
+  .lg label{display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none}
+  .lg input{accent-color:#1A237E;cursor:pointer}
+  .selfcheck{margin-left:auto;font-weight:700}
+  .selfcheck.ok{color:#2E7D32}.selfcheck.bad{color:#C62828}
+  .milestone{margin-top:10px;font-size:11.5px;color:#455A64}
+
+  table{border-collapse:collapse;width:100%;background:#fff;font-size:12.5px}
+  th,td{border:1px solid #CFD8DC;padding:7px 10px;vertical-align:top;text-align:left}
+  th{background:#ECEFF1;font-size:12px;color:#37474F}
+  tr:nth-child(even) td{background:#FAFAFA}
+  code{background:#ECEFF1;border-radius:4px;padding:1px 5px;font-size:12px;font-family:Consolas,'Courier New',monospace}
+  ol,ul{padding-left:22px} li{margin:6px 0;font-size:13.5px}
+  .tag{display:inline-block;border-radius:4px;padding:0 6px;font-size:10.5px;font-weight:700;vertical-align:1px}
+  .tag-red{background:#FFEBEE;color:#C62828;border:1px solid #EF9A9A}
+  .tag-gray{background:#ECEFF1;color:#546E7A;border:1px solid #B0BEC5}
+  .tag-purple{background:#F3E5F5;color:#6A1B9A;border:1px solid #CE93D8}
+  .tag-orange{background:#FFF3E0;color:#E65100;border:1px solid #FFCC80}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <h1>lifewatt 数据源 DAG —— 实装流水线 × 规划数据面 × 包接口（单图）</h1>
+  <div class="meta">
+    <p>生成依据：<code>autoresearch/prepare.R</code>（抓取脚本）、<code>data-raw/assemble.R</code>（组装脚本）、
+      <code>autoresearch/fit_price_forecast.R</code>（产线拟合）、<code>git log</code>、
+      <code>autoresearch/HANDOVER.md</code>、<code>docs/candidate-list.md</code>（候选清单）。</p>
+    <p>最后更新：2026-10-16 第五回合后（exp#38–#43：C1 断供机制列接线、VSRR 州级死亡率数据面入库、
+      D1b/D2 敏感度合成层落地、life_* 双桩按证据实装合成 e0（§E1 了结）、delta_le 弹性核实无直接来源→文献区间引注；
+      勘误版基线不变：切分 30/13 月、单次全窗 h1..13、phaseB gate = 0.657）。
+      <b>区分两层</b>：「实装」= 当前 git 树里真实发生流动的数据；「规划」= candidate-list 入选但尚无代码消费。
+      2026-11-18 隔离契约生效后，exp#28/#29 及 WONDER 抓取残料不在本 DAG 中。</p>
+    <p>图为<b>三条泳道面板</b>（① 实装流水线 / ② 数据源面 / ③ 包对外接口）：带内端口间优先直接连成 S 形；
+      <b>跨模块主干流只走面板之间的带间竖直轨道</b>（不切面板），带内被卡片/标题遮挡时自动曲线绕行并保持 ≥8px 净空；
+      端口按冲突数分散落点，拥挤时溢出到相邻边。悬停连线或节点可高亮溯源，点击连线固定高亮，点击面板表头单带聚焦。
+      旧 mermaid / 手排 SVG 版本（5bfbcbd→d02d1a1）可在 git 历史查看。</p>
+  </div>
+</header>
+
+<section id="overview">
+  <h2>单图总览</h2>
+  <div class="diagram-wrap">
+    <div class="diagram" id="diagram">
+      <svg id="edgeLayer"></svg>
+      <div class="edge-hint" id="edgeHint"></div>
+
+      <div class="band" id="band1" data-band="0">
+        <h3><span class="bh-i">1</span><span class="bh-t">实装流水线 —— 当前 git 树真实发生的数据流动（prepare.R 固件协议）</span><span class="bh-meta"></span></h3>
+        <div class="row">
+          <div class="card c-env" id="c-key"><div class="t">EIA_API_KEY</div><div class="s">环境变量 · 一次性</div></div>
+          <div class="card c-impl" id="c-dfetch"><div class="t">prepare_data() 直拉</div><div class="s">缓存缺失才调 API · 退避重试</div></div>
+          <div class="card c-impl wide" id="c-cache"><div class="t">B1 · b1_monthly_cache.csv</div>
+            <div class="s">51 州 × 43 月 RES · 2023-01→2026-07<br>△ 2025-01 起 19 月 provisional</div></div>
+        </div>
+        <div class="row">
+          <div class="card c-ephem" id="c-eiajson"><div class="t">eia_json/* (51)</div><div class="s">树外抓取残留 · gitignore</div></div>
+          <div class="card c-impl" id="c-assemble"><div class="t">assemble.R</div><div class="s">RES 过滤 · 唯一消费者</div></div>
+        </div>
+        <div class="row">
+          <div class="card c-impl" id="c-prep"><div class="t">prepare.R 固件（只读）</div>
+            <div class="s">切分 2025-06（30 训练/13 valid 月）<br>单次全窗预测 · h 实际 1..13<br>MASE ÷ 季节朴素 · coverage 目标 90%</div></div>
+          <div class="split">
+            <div class="card c-impl" id="c-train"><div class="t">train ≤ 2025-06</div><div class="s">fit 可见范围</div></div>
+            <div class="barrier"><span>防泄漏屏障 · valid 永不入 fit</span></div>
+            <div class="card c-barr" id="c-valid"><div class="t">valid 2025-07..2026-07</div><div class="s">fit 盲区 · 仅参与指标</div></div>
+          </div>
+          <div class="card c-ephem" id="c-runlog"><div class="t">run.log + results.tsv</div>
+            <div class="s">grep 锚点协议（4 行）<br>run.log gitignore · tsv untracked</div></div>
+        </div>
+        <div class="row">
+          <div class="card c-impl" id="c-fitr"><div class="t">fit_price_forecast.R</div><div class="s">source prepare.R<br>注入 train.R 源码</div></div>
+          <div class="card c-impl wide" id="c-fitrd"><div class="t">price_forecast_fit.rds</div>
+            <div class="s">阶段B · consistency .657 ≤ 1.5 · gate_pass<br>fit_as_of = 2026-07<br>（旧 .606 口径作废，见 HANDOVER 勘误）</div></div>
+        </div>
+      </div>
+
+      <div class="band" id="band2" data-band="1">
+        <h3><span class="bh-i">2</span><span class="bh-t">数据源面 —— candidate-list 入选项的落位现状（2026-10-16 第五回合后：A1/A2/B1/D2/C1/VSRR 已被包函数消费）</span><span class="bh-meta"></span></h3>
+        <div class="groups">
+          <div class="group">
+            <h4>价格簇 → electricity_price()</h4>
+            <div class="grow">
+              <div class="card c-impl" id="c-a1"><div class="t">A1 EIA-861</div><div class="s">年度 utility 价 2023-25<br>exp#36 起被年度分支消费</div></div>
+              <div class="card c-impl" id="c-a3"><div class="t">A3 USURDB</div><div class="s">tariff 层修正<br>未接线（tariff() 未建）</div></div>
+            </div>
+            <div class="card c-impl" id="c-a2"><div class="badge">⚠近似</div>
+              <div class="t">A2 OpenEI ZIP→utility</div>
+              <div class="s">mapping_vintage = 2024<br>1 年 vintage 套 3 年（须声明）<br>exp#31 起内嵌 zip 解析</div></div>
+          </div>
+          <div class="group">
+            <h4>健康簇 → health_measure() / premature_mortality()（待建）</h4>
+            <div class="grow">
+              <div class="card c-plan" id="c-g1"><div class="t">G1 ZCTA 关系文件</div><div class="s">Census 2020 边界文件 · 豁免<br>服务 county→ZCTA 聚合（D1a/D1b）</div></div>
+              <div class="card c-plan" id="c-e1"><div class="t">E1 CDC PLACES</div><div class="s">BRFSS-2023 · 2025 release</div></div>
+            </div>
+            <div class="card c-plan" id="c-d1a"><div class="t">D1a WONDER MCD</div><div class="s">死因分解 · 可选 · 人工取数</div></div>
+          </div>
+          <div class="group" id="grp-decision">
+            <h4>决策证据簇 → expected_life_loss() / life_expectancy()</h4>
+            <div class="grow">
+              <div class="card c-impl" id="c-vsrr"><div class="t">VSRR 季度死亡率</div><div class="s">data.cdc.gov 489q-934x · 程序化<br>51 州+US × 2023Q1–2025Q3（△）<br>exp#41 入库 · D1b 的免人工替代面</div></div>
+              <div class="card c-plan" id="c-d1b"><div class="t">D1b WONDER Provisional</div><div class="s">月度 county 级（可选升级）<br>△ 2023-01 → 2026-09 · 人工表单</div></div>
+              <div class="card c-impl" id="c-d2"><div class="t">D2 NCHS 生命表</div><div class="s">全国 LE 锚 · 2023/24 · vendored<br>exp#34 起被 LE 列/合成层消费</div></div>
+            </div>
+            <div class="grow">
+              <div class="card c-impl" id="c-c1"><div class="t">C1 EIA-112</div><div class="s">断供机制 · 仅 2024<br>exp#39 已接线（State Total per-1k 三率）</div></div>
+            </div>
+            <div class="card c-input" id="c-bill"><div class="t">bill · 用户输入</div><div class="s">美元/月 · UX 契约</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="band" id="band3" data-band="2">
+        <h3><span class="bh-i">3</span><span class="bh-t">包对外接口 —— R/ 现状（6/6 导出实装）× 规划待建 ｜ 全图唯一输出面：跨模块主干流只在本带汇聚</span><span class="bh-meta"></span></h3>
+        <div class="row">
+          <div class="card c-impl wide" id="c-f1"><div class="t">electricity_price() / _trend()</div>
+            <div class="s">导出实装（exp#36/#37）<br>年度 = A1×A2 客户加权 · mom = B1 系列<br>yoy 2 行 · mom 42 行（provisional 随行）</div></div>
+          <div class="card c-impl wide" id="c-f3"><div class="t">expected_life_loss() / my_electricity()</div>
+            <div class="s">导出实装（exp#34/#35 · mock 签名）<br>(zipcode,time,bill) / (zipcode,bill,time)<br>D2 锚 vendored · C1 机制列已接线（exp#39 c1_* 五列）<br>delta_le 敏感度参数 + 文献区间引注（exp#40）</div></div>
+          <div class="card c-impl wide" id="c-f2"><div class="t">life_expectancy() / _trend()</div>
+            <div class="s">导出实装（exp#43 · 合成 e0）<br>VSRR 死亡率 × 全国年龄模式 × D2 锚（.le_synth）<br>estimate_type 明示非 NCHS 发布值 · 全假设 DECLARED<br>§E1 了结：来源是死亡率，非患病率冒充</div></div>
+        </div>
+        <div class="row">
+          <h4 class="band-h4">规划接口（未建 · candidate-list §包结构）</h4>
+          <div class="card c-plan wide" id="c-f4"><div class="t">health_measure(zip, measure)</div>
+            <div class="s">E1 主干 · 2025 release · BRFSS-2023 35 项 · 单横截面</div></div>
+          <div class="card c-plan wide" id="c-f5"><div class="t">premature_mortality(zip, years)</div>
+            <div class="s">D1a YPLL-75 可选 · G1 聚合 · 人工取数</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="legend">
+      <div class="lg"><span class="ln trunk"></span>跨模块主干流（带→带 · 只走带间轨道）</div>
+      <div class="lg"><span class="ln inner"></span>模块内流（默认淡显）</div>
+      <div class="lg"><span class="ln"></span>实装数据流</div>
+      <div class="lg"><span class="ln dash"></span>规划边（无代码）</div>
+      <div class="lg"><span class="ln dot"></span>缺口 / 纸面假设</div>
+      <div class="lg"><span class="ln reuse"></span>实装资产复用（未接线）</div>
+      <div class="lg"><span class="ln barr"></span>防泄漏屏障</div>
+      <div class="lg"><span class="sw" style="background:var(--impl);border-color:var(--impl-b)"></span>实装·入库</div>
+      <div class="lg"><span class="sw" style="background:var(--ephem);border-color:var(--ephem-b);border-style:dashed"></span>临时·未入库</div>
+      <div class="lg"><span class="sw" style="background:var(--plan);border-color:var(--plan-b);border-style:dashed"></span>规划源</div>
+      <div class="lg"><span class="sw" style="background:var(--stub);border-color:var(--stub-b)"></span>占位桩 stop()</div>
+      <div class="lg"><span class="sw" style="background:var(--contract);border-color:var(--contract-b);border-style:dashed"></span>仅 UX 契约</div>
+      <div class="lg"><span class="sw" style="background:var(--input);border-color:var(--input-b)"></span>用户输入</div>
+      <div class="lg"><span class="sw" style="background:var(--gap);border-color:var(--gap-b);border-style:dotted"></span>待立缺口</div>
+      <div class="lg"><label><input type="checkbox" id="trunkToggle" checked> 突出主干流（默认）</label></div>
+      <div class="lg"><label><input type="checkbox" id="labelsToggle"> 标签常显（默认悬停显示）</label></div>
+      <div class="selfcheck" id="selfcheck">路由自检 …</div>
+    </div>
+    <div class="milestone">
+      △ = provisional 标签（B1 的 19 个月、VSRR 全窗口），输出须显式区分「实测/预测 + 已回改/待回改」。
+      里程碑：mase 0.5966（CI95 .50–.70，州块 bootstrap）· coverage 0.914 · 阶段B consistency 0.657 ≤ 1.5
+      gate（2026-10-16 口径修复重跑，gate_pass 落 rds；旧 .606 口径作废，见 HANDOVER 勘误）·
+      fit_as_of = 2026-07 · 缓存优先于 API，下游不得绕过 b1_monthly_cache.csv ·
+      阶段C（exp#30–#43）：6 导出全实装（exp#38–#43：C1 机制列、VSRR 死亡率面、D1b/D2 合成层、
+      life_* 合成 e0 收口 §E1 了结、delta_le 弹性核实=无直接来源→文献区间引注），R CMD check OK。
+      悬停任意连线或节点可高亮溯源（点击连线固定高亮，Esc 取消）；点击面板表头单带聚焦；
+      「突出主干流」默认开（带内流淡显），加 <code>#labels=on</code> 标签常显、<code>#all=1</code> 全量走线。
+    </div>
+  </div>
+
+  <h3 style="margin-top:18px">读图指南</h3>
+  <ul>
+    <li><b>三条泳道</b>：三个圆角面板＝三个大模块，面板表头右侧徽标给出该带边数（带内 n · 出 m · 入 k）；
+      ③ 带是全图<b>唯一输出面</b>——跨模块主干流只在这里汇聚。点击面板表头可单带聚焦（Esc 退出）。</li>
+    <li><b>分层</b>：<b>跨模块主干流</b>（带→带，实线粗 2.6px + 白色衬底）就是最终流转数据，
+      <b>只走面板之间的带间竖直轨道</b>，不切面板内部；<b>模块内流</b>（1.5px）在面板内部走线，
+      默认淡显（可在图例取消「突出主干流」）。走线与卡片/标题/面板边框保持 ≥8px 净空，轨道按源/目标中点分配、互不重叠。</li>
+    <li><b>线型</b>：在「主干 / 带内」分层之上再叠语义——实线 = 有代码证据的数据流（含 2026-10-16 第五回合——A1/A2/B1/fit.rds/D2/C1/VSRR → 包函数均已接线）；
+      虚线 = 规划边（D1b 月度标签、e1/d1a→待建函数）；点线 = 缺口/纸面假设（G1→D1a 的 county→ZCTA 聚合桥）；
+      灰点线 = 实装资产复用但未接线（VSRR 面尚未进 expected_life_loss）。</li>
+    <li><b>屏障</b>：①带中部红色虚线 = 防泄漏屏障。<code>train ≤2025-06</code> 是 fit 唯一可见范围；
+      <code>valid 2025-07..2026-07</code> 只进指标计算，永不入 fit；阶段B 全量重训是一次
+      <b>受 gate 约束的显式越界</b>（consistency ≤ 1.5，见 <code>fit_price_forecast.R</code>）。</li>
+    <li><b>走线规则</b>：带内端口间优先直接连成 S 形平滑曲线；被卡片/标题/面板边框遮挡时自动以圆滑折线绕行
+      （圆角半径逐级收缩直到净空达标，窄缝处走带贴边惩罚的栅格寻路）；端口按冲突数分散落点，冲突过度时自动溢出到相邻边。
+      右上角「路由自检」逐点复核 穿框 / 交叉 / 近贴 / 标签重叠 / 主干轨道数 / 用时（端口邻域 12px 为构造性豁免）。</li>
+    <li><b>标签与溯源</b>：标签默认悬停显示（图例可勾选「常显」并自动避让）；每条边起点为小圆点、终点为箭头。
+      悬停连线或节点即高亮相关元素并浮出「源 → 目标」提示；点击连线固定高亮，Esc 或点击空白取消。</li>
+    <li>节点明细（物理位置、生产者、消费者）见下表；指标数字不进节点，见图底里程碑行。</li>
+  </ul>
+</section>
+
+<section id="constraints">
+  <h2>硬约束（决定 DAG 形状）</h2>
+  <ul>
+    <li><b>时间窗</b>：2023-01 → 2026-12（按数据年份判定，不看发布日期）。
+      EIA 月度实测至 2026-07，2025-01 起 19 月为 provisional（终值回改须声明）；最终死亡数据止 2024；
+      provisional 死亡数据窗口内可切 2023-01 → 2026-09（约 45 个月）。</li>
+    <li><b>池化禁令</b>：多年池化估计一律拒绝（CHR&amp;R、ACS 5-year、F 组全灭）。
+      唯二豁免：Census 2020 ZCTA 关系文件（边界文件）；provisional/最终两层声明。</li>
+    <li><b>评估协议</b>（实装 = prepare.R evaluate_model）：时序切分 2025-06（30 训练月 / 13 valid 月），
+      valid = 2025-07 → 2026-07，<b>单次全窗预测</b>：h 实际覆盖 1..13（horizon 分桶仅用于区间校准；
+      "h=1..3 / walk-forward"为注释残留，2026-10-16 勘误），MASE ÷ 季节朴素，coverage 目标 90%（[0.85, 0.95]）。
+      valid 段永远不得进入 fit 可见范围（防泄漏边界，图中以红色屏障标注）。</li>
+  </ul>
+</section>
+
+<section id="nodes">
+  <h2>节点明细</h2>
+  <h3>实装层（有代码证据）</h3>
+  <table>
+    <tr><th>节点</th><th>物理位置</th><th>生产者</th><th>消费者</th><th>内容/口径</th></tr>
+    <tr><td><code>EIA_API_KEY</code></td><td>环境变量</td><td>人工注册</td><td><code>prepare.R::prepare_data()</code>（缓存缺失时）</td>
+      <td>拉取时的退避重试靠它；生产运行仅需缓存</td></tr>
+    <tr><td><code>eia_json/*</code> <span class="tag tag-gray">gitignore</span></td><td><code>data-raw/eia_json/*.json</code> (51)</td>
+      <td>树外抓取残留（抓取脚本不在库内）</td><td><code>assemble.R</code>（唯一）</td>
+      <td>逐州 <code>retail-sales</code> 月度原始响应</td></tr>
+    <tr><td><code>B1</code> 缓存</td><td><code>data-raw/b1_monthly_cache.csv</code> → <code>inst/extdata/b1_monthly_cache.csv</code></td>
+      <td><code>assemble.R</code>；或 <code>prepare_data()</code> 直拉 API</td>
+      <td><code>prepare.R::prepare_data()</code>、包内 <code>.monthly_cache()</code>（exp#32 起）</td>
+      <td>51 州 × 43 月，<code>sector = RES</code>，2023-01→2026-07；<b>2025-01 起 19 月为 provisional</b>（回改风险须在输出中声明）</td></tr>
+    <tr><td>prepare.R 固件</td><td><code>autoresearch/prepare.R</code></td><td>git <code>f26d07f</code>（只读；注释 2026-10-16 勘误）</td>
+      <td><code>train.R</code>、<code>fit_price_forecast.R</code></td>
+      <td>时序切分 2025-06（30/13 月）、单次全窗评估（h 1..13）、MASE 分母、coverage 检查；<b>无</b>孤儿/重复行校验</td></tr>
+    <tr><td>train.R</td><td><code>autoresearch/train.R</code></td><td>实验循环（唯一可改）</td><td><code>fit_price_forecast.R</code> 源码注入</td>
+      <td>三体模型 <code>{lag12+漂移12m、v0+b·h、HW additive}</code></td></tr>
+    <tr><td>评估指标 <span class="tag tag-gray">临时</span></td>
+      <td><code>autoresearch/run.log</code>（gitignore）、<code>results.tsv</code>（untracked）</td>
+      <td><code>Rscript train.R</code> + grep 锚点</td><td>评分循环、HANDOVER 里程碑表</td>
+      <td>mase 0.5966 / CI95 [.50,.70] / coverage 0.914（数字在图底里程碑行）</td></tr>
+    <tr><td>阶段B 拟合</td><td><code>data-raw/price_forecast_fit.rds</code> → <code>inst/extdata/price_forecast_fit.rds</code></td><td><code>fit_price_forecast.R</code></td>
+      <td><code>.triplet_predict()</code>（<code>.price_at()</code> 预测 regime，exp#33）</td>
+      <td><code>fit_as_of=2026-07</code>，consistency 0.657 ≤ 1.5× gate（gate_pass/contract 落 rds；2026-10-16 口径修复重跑）</td></tr>
+    <tr><td><code>A2</code> OpenEI 映射</td><td><code>inst/extdata/openei_zip2state_slim.csv.gz</code>（60,624 对；原件 <code>data-raw/openei/</code>）</td>
+      <td><code>data-raw/assemble_openei_slim.R</code>（exp#31）</td><td><code>.zip_lookup()</code> / <code>.zip_state()</code>（exp#31 起，全部 zip 解析）</td>
+      <td>ZIP→eiaid→utility_name→state，<code>mapping_vintage=2024</code>，1 版套 3 年近似必须声明</td></tr>
+    <tr><td><code>A1</code> EIA-861 年度层</td><td><code>inst/extdata/eia861_annual_slim.csv.gz</code>（4,501 行；原件 <code>data-raw/eia861/</code>）</td>
+      <td><code>data-raw/assemble_861_slim.R</code>（exp#36）</td><td><code>.zip_annual_price()</code> → <code>electricity_price(year=)</code>（客户加权）</td>
+      <td>三年 final zip 价，customers 覆盖 99.5%；2026 年缺年度终值</td></tr>
+    <tr><td><code>C1</code> EIA-112 断供</td><td><code>inst/extdata/eia112_state_month_slim.csv.gz</code>（612 行；原件 <code>data-raw/eia112/</code> gitignore）</td>
+      <td><code>data-raw/assemble_112_slim.R</code>（exp#39）</td><td><code>.c1_at()</code> → <code>expected_life_loss()</code> / <code>my_electricity()</code> c1_* 五列</td>
+      <td>State Total 口径（utility + State Adjustment）per-1k 三率；仅 2024（调查未延展）；窗口外 NA+注记</td></tr>
+    <tr><td><code>VSRR</code> 死亡率面板</td><td><code>inst/extdata/vsrr_state_quarter_slim.csv.gz</code>（2,288 行）+ <code>vsrr_national_age_slim.csv.gz</code>（220 行）</td>
+      <td><code>data-raw/assemble_vsrr_slim.R</code>（exp#41，data.cdc.gov 489q-934x）</td><td><code>.vsrr_state_rate()</code> / <code>.vsrr_age_pattern()</code> → <code>.le_synth()</code>（exp#42）</td>
+      <td>51 州+US × 11 季 × 3m/12m × crude/age-adj；全国年龄 10 组（<b>crude only</b>，无州×年龄分解）；provisional 全行 TRUE</td></tr>
+    <tr><td>合成层 <code>mortality-synth.R</code></td><td><code>R/mortality-synth.R</code></td>
+      <td>exp#42（Preston/Chiang abridged life table）</td><td><code>life_expectancy()</code> / <code>life_expectancy_trend()</code>（exp#43）</td>
+      <td>m = 州/US age-adjusted 率比（双侧实测）→ 年龄模式 × m → 生命表 → Δe1 移植 D2 锚；全假设 DECLARED</td></tr>
+  </table>
+
+  <h3 style="margin-top:20px">规划层（candidate-list 入选，无实装代码）</h3>
+  <table>
+    <tr><th>节点</th><th>预期角色</th><th>对 DAG 其它节点的依赖</th><th>当前阻塞点</th></tr>
+    <tr><td><code>D1b</code> WONDER Provisional（月度 county 级）</td><td>P1′ 时序标签源（可选升级）</td><td><b>无外部依赖</b>（独立）</td>
+      <td>需浏览器表单人工取数 + 0-9 抑制风险预检；州级季度面已由 VSRR 程序化覆盖（exp#41）</td></tr>
+    <tr><td><code>D1a</code> WONDER MCD 最终</td><td>死因分解（可选模块）</td><td>独立</td><td>需人工取数</td></tr>
+    <tr><td><code>E1</code> CDC PLACES</td><td>架构主干（BRFSS-2023，<b>ZCTA 原生</b>）</td><td><b>无需 G1</b>（无需 county 桥）；消费方为 health_measure()（待建）</td>
+      <td>release 间 YoY 已撤销；⚠ 患病率不得冒充 life_expectancy（candidate-list §E1；#43 后该约束只剩 E1 自身适用）</td></tr>
+    <tr><td><code>G1</code> Census 2020 关系文件</td><td>唯一 county→ZCTA 聚合桥（D1a/D1b 与 MAUP 讨论）</td><td>独立</td>
+      <td>豁免年份约束的唯一边界节点；<b>无任何抓取动作</b></td></tr>
+    <tr><td><code>A3</code> USURDB</td><td>tariff 层修正</td><td>依赖 A2 的 eiaid</td><td>—</td></tr>
+  </table>
+
+  <h3 style="margin-top:20px">包接口（③带，R/ 目录现状）</h3>
+  <table>
+    <tr><th>接口</th><th>现状</th><th>拟接线</th></tr>
+    <tr><td><code>electricity_price()</code> / <code>electricity_price_trend()</code></td>
+      <td><b>导出实装</b>（exp#36/#37）<span class="tag tag-gray">实装</span></td>
+      <td>已接线：A1×A2 年度（客户加权）、B1 cache mom/yoy；未建：A3 tariff 落点</td></tr>
+    <tr><td><code>life_expectancy()</code> / <code>life_expectancy_trend()</code></td>
+      <td><b>导出实装</b>（exp#43 · 合成 e0）<span class="tag tag-gray">实装</span></td>
+      <td>已接线：VSRR 死亡率面板 × D2 锚（.le_synth，estimate_type 明示非 NCHS 发布值）；yoy/qoq 季度趋势（源为季度频，"mom" 诚实拒绝）；§E1 了结——来源是死亡率非患病率；D1b 月度 county 面仍可选升级</td></tr>
+    <tr><td><code>expected_life_loss()</code> / <code>my_electricity()</code></td>
+      <td><b>导出实装</b>（exp#34/#35 · mock 签名）<span class="tag tag-gray">实装</span>（exp#29 幻觉版已于 <code>dd710c7</code> 清退，其编造统计量未复用）</td>
+      <td>已接线：B1/phaseB 双 regime、bill÷price 反推、bill 证据、D2 锚、C1 机制列（exp#39 c1_*）、delta_le 敏感度参数 + 文献区间引注（exp#40：核实无直接弹性，Richardson BMJ Public Health 2023;1:e000097 / Chirakijja NBER WP 25681）；未接线：D1b 标签、VSRR 合成列（复用边）</td></tr>
+    <tr><td><code>health_measure(zip, measure)</code></td>
+      <td><b>未建（规划）</b> <span class="tag tag-orange">candidate-list §包结构</span></td>
+      <td>E1 2025 release（ZCTA 原生，35 项）</td></tr>
+    <tr><td><code>premature_mortality(zip, years, deaths = NULL)</code></td>
+      <td><b>未建（规划）</b> <span class="tag tag-orange">候选</span></td>
+      <td>D1a YPLL-75（可选）× G1 聚合；D1b 时序（P1′）</td></tr>
+  </table>
+</section>
+
+<section id="logic">
+  <h2>「数据库逻辑」（数据规则而非表结构）</h2>
+  <ol>
+    <li><b>缓存优先于 API</b>：<code>prepare.R</code> 先读 <code>b1_monthly_cache.csv</code>，缺失才要求拉全；
+      EIA 限速通过逐州重试背压（<code>Sys.sleep(2 + 3*i)</code>）实现；<b>下游不得绕过缓存</b>。</li>
+    <li><b>切分不可泄漏</b>：<code>2025-07..2026-07</code> 是 valid，fit 内永远是盲区；阶段B 全量重训是一次
+      受一致性 gate 盯守的显式越界（重训 in-sample 残差 MAD[2025-07..2026-07 池化] ÷ 阶段A valid 残差 MAD
+      ≤ 1.5，结果以 <code>gate_pass</code> 落入 fit.rds；0.657 过门，2026-10-16 重跑）。</li>
+    <li><b>grep 锚点即界面</b>：<code>train.R</code> 与评分循环之间的“接口协议”只是 <code>run.log</code> 的四行字符串：
+      <code>mase:</code> / <code>bad_coverage:</code> / <code>coverage:</code> / <code>n_predict:</code>，无类型保证 → 任何改口径动作都会
+      降级成账本漂移（exp#2/#7 的 coverage 数已经历两次 advance-rule 修订，不可纵向比较）。</li>
+    <li><b>provisional 双层声明</b>：B1 43 月中 19 月为 provisional（2025-01→2026-07）；VSRR 全窗口为
+      provisional（终值将回改）；mortality 允许 provisional 覆盖窗口，但输出必须显式区分“实测/预测 + 已回改/待回改”。</li>
+    <li><b>来源强制（2026-11-18 契约）</b>：任何进入 DAG 输出层的数值不得是无来源硬码；
+      delta_le 只能以显式敏感度参数存在——exp#40 核实结论：<b>无美国 ZIP 级"电价→ΔLE"直接弹性</b>，
+      <code>sensitivity_assumption</code> 附文献区间引注（Richardson BMJ Public Health 2023;1:e000097 情景带
+      −0.7..−1.6y，非单位电价弹性；Chirakijja NBER WP 25681 方向证据）。</li>
+    <li><b>合成层声明假设</b>（exp#42/43）：州年龄模式=全国年龄模式×m（VSRR 无州×年龄分解）、
+      abridged life table 约定（ax=n/2、85+ e=1/m）、Δe1→Δe0 可移植性——全部以
+      <code>sensitivity_assumption</code> 的 DECLARED 标签随行，L1 自检（US m=1 → e0=锚值）为回归锚。</li>
+    <li><b>OpenEI 映射非时间序列</b>：A2 是 mapping vintage 2024，<b>唯一套用 3 年的槽位</b>，
+      接线时须以 provenance 字段（<code>mapping_vintage</code> / <code>as_of</code>，字段名接线时定稿）
+      标进每个输出行以便日后重估。</li>
+    <li><b>临时产物分层</b>：<code>eia_json/</code>（gitignore）与 <code>run.log</code>（gitignore）、<code>results.tsv</code>（untracked）
+      都不是入库数据；图中灰色节点专表这一层，凡“实装”结论不依赖它们在 git 树内。</li>
+  </ol>
+</section>
+
+<script>
+var CELL = 6, INFLATE = 8, STUB = 18, CLEAR = 8;
+var HEAT_W = 3.2, BEND_W = 20, HUG_W = 1.2, HEAT_EPS = 0.35;
+var LANE_GAP = 13, LANE_HALF = 10, LANE_IN = 14, MIN_PORT = 12, CORNER = 14;
+var DIRV = { top: [0, -1], bottom: [0, 1], left: [-1, 0], right: [1, 0] };
+
+function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
+function snapC(v) { return Math.round((v - CELL / 2) / CELL) * CELL + CELL / 2; }
+
+function distRect(p, q) {
+  var dx = Math.max(q.x - p.x, 0, p.x - q.x2);
+  var dy = Math.max(q.y - p.y, 0, p.y - q.y2);
+  return Math.hypot(dx, dy);
+}
+function clearDist(p, q) {
+  if (!q.panel) return distRect(p, q);
+  if (!(p.x > q.x && p.x < q.x2 && p.y > q.y && p.y < q.y2)) return distRect(p, q);
+  return Math.min(p.x - q.x, q.x2 - p.x, p.y - q.y, q.y2 - p.y);
+}
+function clearDistRects(p, rects) {
+  var m = 1e9;
+  for (var r = 0; r < rects.length; r++) {
+    var d = clearDist(p, rects[r]);
+    if (d < m) m = d;
+  }
+  return m;
+}
+
+function buildGrid(W, H, rects, gates) {
+  var cols = Math.ceil(W / CELL) + 4, rows = Math.ceil(H / CELL) + 4;
+  var g = new Uint8Array(cols * rows);
+  function fill(r, v) {
+    var x1 = r.x - INFLATE, y1 = r.y - INFLATE, x2 = r.x2 + INFLATE, y2 = r.y2 + INFLATE;
+    for (var j = 0; j < rows; j++) {
+      var cy = (j - 2) * CELL + CELL / 2;
+      if (cy < y1 || cy > y2) continue;
+      for (var i = 0; i < cols; i++) {
+        var cx = (i - 2) * CELL + CELL / 2;
+        if (cx < x1 || cx > x2) continue;
+        g[j * cols + i] = v;
+      }
+    }
+  }
+  function fillFrame(r) {
+    var x1 = r.x - INFLATE, y1 = r.y - INFLATE, x2 = r.x2 + INFLATE, y2 = r.y2 + INFLATE;
+    for (var j = 0; j < rows; j++) {
+      var cy = (j - 2) * CELL + CELL / 2;
+      if (cy < y1 || cy > y2) continue;
+      for (var i = 0; i < cols; i++) {
+        var cx = (i - 2) * CELL + CELL / 2;
+        if (cx < x1 || cx > x2) continue;
+        var inX = cx > r.x && cx < r.x2, inY = cy > r.y && cy < r.y2;
+        var near = (cx - r.x < INFLATE) || (r.x2 - cx < INFLATE) ||
+                   (cy - r.y < INFLATE) || (r.y2 - cy < INFLATE);
+        if (!inX || !inY || near) g[j * cols + i] = 1;
+      }
+    }
+  }
+  rects.forEach(function (r) { (r.panel ? fillFrame : fill)(r, 1); });
+  if (gates) gates.forEach(function (r) { fill(r, 0); });
+  return { g: g, cols: cols, rows: rows };
+}
+
+function cellOf(grid, x, y) {
+  return {
+    i: clamp(Math.round((x - CELL / 2) / CELL) + 2, 0, grid.cols - 1),
+    j: clamp(Math.round((y - CELL / 2) / CELL) + 2, 0, grid.rows - 1)
+  };
+}
+function cellCenter(i, j) { return { x: (i - 2) * CELL + CELL / 2, y: (j - 2) * CELL + CELL / 2 }; }
+function freeAt(grid, i, j) {
+  return i >= 0 && j >= 0 && i < grid.cols && j < grid.rows && !grid.g[j * grid.cols + i];
+}
+
+function nearestFree(grid, ci, cj) {
+  if (freeAt(grid, ci, cj)) return { i: ci, j: cj };
+  for (var r = 1; r <= 24; r++) {
+    for (var dj = -r; dj <= r; dj++) {
+      for (var di = -r; di <= r; di++) {
+        if (Math.max(Math.abs(di), Math.abs(dj)) !== r) continue;
+        if (freeAt(grid, ci + di, cj + dj)) return { i: ci + di, j: cj + dj };
+      }
+    }
+  }
+  return { i: ci, j: cj };
+}
+
+function segBlocked(grid, a, b) {
+  var steps = Math.max(1, Math.ceil(Math.max(Math.abs(b.x - a.x), Math.abs(b.y - a.y)) / (CELL / 2)));
+  for (var s = 0; s <= steps; s++) {
+    var t = s / steps;
+    var c = cellOf(grid, a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t);
+    if (!freeAt(grid, c.i, c.j)) return true;
+  }
+  return false;
+}
+function polyBlocked(grid, pts) {
+  for (var i = 0; i + 1 < pts.length; i++) if (segBlocked(grid, pts[i], pts[i + 1])) return true;
+  return false;
+}
+
+function sampleCells(grid, pts, cb) {
+  for (var i = 0; i + 1 < pts.length; i++) {
+    var a = pts[i], b = pts[i + 1];
+    var steps = Math.max(1, Math.ceil(Math.max(Math.abs(b.x - a.x), Math.abs(b.y - a.y)) / (CELL / 2)));
+    for (var s = 0; s <= steps; s++) {
+      var t = s / steps;
+      var c = cellOf(grid, a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t);
+      cb(c.i, c.j);
+    }
+  }
+}
+function heatCost(grid, heat, pts) {
+  var sum = 0;
+  sampleCells(grid, pts, function (i, j) { sum += heat[j * grid.cols + i]; });
+  return sum;
+}
+function bumpHeat(grid, heat, i, j, v) {
+  if (i < 0 || j < 0 || i >= grid.cols || j >= grid.rows) return;
+  heat[j * grid.cols + i] += v;
+}
+function stampHeat(grid, heat, pts) {
+  sampleCells(grid, pts, function (i, j) {
+    bumpHeat(grid, heat, i, j, 1);
+    bumpHeat(grid, heat, i + 1, j, HEAT_EPS); bumpHeat(grid, heat, i - 1, j, HEAT_EPS);
+    bumpHeat(grid, heat, i, j + 1, HEAT_EPS); bumpHeat(grid, heat, i, j - 1, HEAT_EPS);
+    bumpHeat(grid, heat, i + 1, j + 1, HEAT_EPS * 0.45); bumpHeat(grid, heat, i + 1, j - 1, HEAT_EPS * 0.45);
+    bumpHeat(grid, heat, i - 1, j + 1, HEAT_EPS * 0.45); bumpHeat(grid, heat, i - 1, j - 1, HEAT_EPS * 0.45);
+  });
+}
+
+function MinHeap() { this.a = []; }
+MinHeap.prototype.push = function (o) {
+  var a = this.a; a.push(o); var k = a.length - 1;
+  while (k > 0) {
+    var p = (k - 1) >> 1;
+    if (a[p].f <= a[k].f) break;
+    var t = a[p]; a[p] = a[k]; a[k] = t; k = p;
+  }
+};
+MinHeap.prototype.pop = function () {
+  var a = this.a, top = a[0], last = a.pop();
+  if (a.length) {
+    a[0] = last;
+    for (var k = 0; ;) {
+      var l = 2 * k + 1, r = l + 1, m = k;
+      if (l < a.length && a[l].f < a[m].f) m = l;
+      if (r < a.length && a[r].f < a[m].f) m = r;
+      if (m === k) break;
+      var t = a[m]; a[m] = a[k]; a[k] = t; k = m;
+    }
+  }
+  return top;
+};
+Object.defineProperty(MinHeap.prototype, "size", { get: function () { return this.a.length; } });
+
+function astar(grid, heat, aC, bC) {
+  var cols = grid.cols, N = cols * grid.rows;
+  var s = aC.j * cols + aC.i, t = bC.j * cols + bC.i;
+  if (s === t) return [aC];
+  var gS = new Float64Array(N); gS.fill(Infinity);
+  var came = new Int32Array(N); came.fill(-1);
+  var dirI = new Int8Array(N); dirI.fill(-1);
+  var closed = new Uint8Array(N);
+  var heap = new MinHeap();
+  function h(i, j) { return Math.abs(i - bC.i) + Math.abs(j - bC.j); }
+  gS[s] = 0;
+  heap.push({ p: s, f: h(aC.i, aC.j) });
+  var D = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+  while (heap.size) {
+    var p = heap.pop().p;
+    if (closed[p]) continue;
+    closed[p] = 1;
+    if (p === t) {
+      var path = [], q = t;
+      while (q !== -1) {
+        path.push({ i: q % cols, j: (q - q % cols) / cols });
+        q = came[q];
+      }
+      return path.reverse();
+    }
+    var i = p % cols, j = (p - i) / cols;
+    for (var d = 0; d < 4; d++) {
+      var ni = i + D[d][0], nj = j + D[d][1];
+      if (!freeAt(grid, ni, nj)) continue;
+      var np = nj * cols + ni;
+      if (closed[np]) continue;
+      var cost = 1 + heat[np] * HEAT_W;
+      if (dirI[p] >= 0 && dirI[p] !== d) cost += BEND_W;
+      if (!freeAt(grid, ni + 1, nj)) cost += HUG_W;
+      if (!freeAt(grid, ni - 1, nj)) cost += HUG_W;
+      if (!freeAt(grid, ni, nj + 1)) cost += HUG_W;
+      if (!freeAt(grid, ni, nj - 1)) cost += HUG_W;
+      var ng = gS[p] + cost;
+      if (ng < gS[np] - 1e-9) {
+        gS[np] = ng; came[np] = p; dirI[np] = d;
+        heap.push({ p: np, f: ng + h(ni, nj) });
+      }
+    }
+  }
+  return null;
+}
+
+function simplify(grid, pts) {
+  var out = dedupe(pts);
+  var changed = true;
+  while (changed) {
+    changed = false;
+    for (var i = 1; i + 1 < out.length; i++) {
+      var a = out[i - 1], c = out[i + 1];
+      if ((Math.abs(a.x - c.x) < 0.5 || Math.abs(a.y - c.y) < 0.5) && !segBlocked(grid, a, c)) {
+        out.splice(i, 1); changed = true; i--;
+      }
+    }
+  }
+  return out;
+}
+
+function segLen(a, b) {
+  return Math.abs(b.x - a.x) + Math.abs(b.y - a.y);
+}
+
+function pointSegDist(p, a, b) {
+  var dx = b.x - a.x, dy = b.y - a.y, L2 = dx * dx + dy * dy;
+  var t = L2 ? clamp(((p.x - a.x) * dx + (p.y - a.y) * dy) / L2, 0, 1) : 0;
+  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+}
+
+function dedupe(pts) {
+  var out = [];
+  for (var i = 0; i < pts.length; i++) {
+    var p = pts[i], last = out[out.length - 1];
+    if (!last || Math.abs(last.x - p.x) > 0.5 || Math.abs(last.y - p.y) > 0.5) out.push(p);
+  }
+  for (var k = 1; k + 1 < out.length;) {
+    var a = out[k - 1], b = out[k], c = out[k + 1];
+    var col = (Math.abs(a.x - b.x) < 0.5 && Math.abs(b.x - c.x) < 0.5) ||
+              (Math.abs(a.y - b.y) < 0.5 && Math.abs(b.y - c.y) < 0.5);
+    if (col) out.splice(k, 1); else k++;
+  }
+  return out;
+}
+
+function polyLen(pts) {
+  var L = 0;
+  for (var i = 0; i + 1 < pts.length; i++) L += segLen(pts[i], pts[i + 1]);
+  return L;
+}
+
+function segCross(a1, a2, b1, b2) {
+  var ah = Math.abs(a1.y - a2.y) < 0.5, bh = Math.abs(b1.y - b2.y) < 0.5;
+  if (ah && bh) {
+    return Math.abs(a1.y - b1.y) < 6 &&
+      Math.min(Math.max(a1.x, a2.x), Math.max(b1.x, b2.x)) - Math.max(Math.min(a1.x, a2.x), Math.min(b1.x, b2.x)) > 8;
+  }
+  if (!ah && !bh) {
+    return Math.abs(a1.x - b1.x) < 6 &&
+      Math.min(Math.max(a1.y, a2.y), Math.max(b1.y, b2.y)) - Math.max(Math.min(a1.y, a2.y), Math.min(b1.y, b2.y)) > 8;
+  }
+  var h = ah ? [a1, a2] : [b1, b2];
+  var v = ah ? [b1, b2] : [a1, a2];
+  var x = v[0].x, y = h[0].y;
+  return x > Math.min(h[0].x, h[1].x) + 4 && x < Math.max(h[0].x, h[1].x) - 4 &&
+         y > Math.min(v[0].y, v[1].y) + 4 && y < Math.max(v[0].y, v[1].y) - 4;
+}
+
+function parallelNear(s1, s2) {
+  var a1 = s1[0], a2 = s1[1], b1 = s2[0], b2 = s2[1];
+  var ah = Math.abs(a1.y - a2.y) < 0.5, bh = Math.abs(b1.y - b2.y) < 0.5;
+  if (ah !== bh) return false;
+  var d, o;
+  if (ah) {
+    d = Math.abs(a1.y - b1.y);
+    if (d < 0.5 || d > 7) return false;
+    o = Math.min(Math.max(a1.x, a2.x), Math.max(b1.x, b2.x)) -
+        Math.max(Math.min(a1.x, a2.x), Math.min(b1.x, b2.x));
+  } else {
+    d = Math.abs(a1.x - b1.x);
+    if (d < 0.5 || d > 7) return false;
+    o = Math.min(Math.max(a1.y, a2.y), Math.max(b1.y, b2.y)) -
+        Math.max(Math.min(a1.y, a2.y), Math.min(b1.y, b2.y));
+  }
+  return o > 16;
+}
+
+function joinOrtho(a, b, grid) {
+  if (Math.abs(a.x - b.x) < 0.5 || Math.abs(a.y - b.y) < 0.5) {
+    return segBlocked(grid, a, b) ? null : [];
+  }
+  var e1 = { x: b.x, y: a.y };
+  if (!segBlocked(grid, a, e1) && !segBlocked(grid, e1, b)) return [e1];
+  var e2 = { x: a.x, y: b.y };
+  if (!segBlocked(grid, a, e2) && !segBlocked(grid, e2, b)) return [e2];
+  return null;
+}
+function curveCtrl(a, b, ka, kb) {
+  var d = Math.hypot(b.x - a.x, b.y - a.y);
+  var k = Math.min(56, Math.max(10, d * 0.42));
+  return [
+    { x: a.x + ka[0] * k, y: a.y + ka[1] * k },
+    { x: b.x + kb[0] * k, y: b.y + kb[1] * k }
+  ];
+}
+function cubicPts(p0, c1, c2, p3, n) {
+  var out = [];
+  for (var i = 0; i <= n; i++) {
+    var t = i / n, u = 1 - t;
+    var a = u * u * u, b = 3 * u * u * t, c = 3 * u * t * t, d = t * t * t;
+    out.push({ x: a * p0.x + b * c1.x + c * c2.x + d * p3.x,
+               y: a * p0.y + b * c1.y + c * c2.y + d * p3.y });
+  }
+  return out;
+}
+function directClear(rects, sp, tp, df, dt) {
+  var cc = curveCtrl(sp, tp, df, dt);
+  var pts = cubicPts(sp, cc[0], cc[1], tp, 30);
+  for (var i = 0; i < pts.length; i++) {
+    var p = pts[i];
+    if (Math.hypot(p.x - sp.x, p.y - sp.y) < CLEAR + 3) continue;
+    if (Math.hypot(p.x - tp.x, p.y - tp.y) < CLEAR + 3) continue;
+    if (clearDistRects(p, rects) < CLEAR) return false;
+  }
+  return true;
+}
+function fitCorner(p0, p1, p2, l1, l2, rects) {
+  var max = Math.min(24, 0.4 * Math.min(l1, l2));
+  for (var k = 4; k >= 1; k--) {
+    var rr = max * k / 4;
+    var a = { x: p1.x - (p1.x - p0.x) / l1 * rr, y: p1.y - (p1.y - p0.y) / l1 * rr };
+    var b = { x: p1.x + (p2.x - p1.x) / l2 * rr, y: p1.y + (p2.y - p1.y) / l2 * rr };
+    var ok = true;
+    for (var s = 0; s <= 8 && ok; s++) {
+      var t = s / 8, u = 1 - t;
+      var q = { x: u * u * a.x + 2 * u * t * p1.x + t * t * b.x,
+                y: u * u * a.y + 2 * u * t * p1.y + t * t * b.y };
+      if (clearDistRects(q, rects) < CLEAR - 3) ok = false;
+    }
+    if (ok) return { a: a, b: b };
+  }
+  return null;
+}
+function edgeGeom(r, rects) {
+  var pts = r.pts, e = r.e, df = DIRV[e.fs], dt = DIRV[e.ts];
+  var last = pts[pts.length - 1];
+  if (r.direct) {
+    var cc = curveCtrl(pts[0], last, df, dt);
+    return {
+      d: "M" + pts[0].x + "," + pts[0].y + " C" + cc[0].x + "," + cc[0].y + " " +
+         cc[1].x + "," + cc[1].y + " " + last.x + "," + last.y,
+      samples: cubicPts(pts[0], cc[0], cc[1], last, 28)
+    };
+  }
+  var d = "M" + pts[0].x + "," + pts[0].y;
+  var samples = [pts[0]];
+  for (var i = 1; i + 1 < pts.length; i++) {
+    var p0 = pts[i - 1], p1 = pts[i], p2 = pts[i + 1];
+    var l1 = Math.hypot(p1.x - p0.x, p1.y - p0.y), l2 = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+    if (l1 < 0.5 || l2 < 0.5) continue;
+    var fit = rects ? fitCorner(p0, p1, p2, l1, l2, rects) : { a: p1, b: p1 };
+    if (!fit) { samples.push(p1); continue; }
+    var a = fit.a, b = fit.b;
+    if (Math.abs(a.x - p0.x) > 0.5 || Math.abs(a.y - p0.y) > 0.5) d += " L" + a.x + "," + a.y;
+    d += " Q" + p1.x + "," + p1.y + " " + b.x + "," + b.y;
+    samples.push(a);
+    for (var s = 1; s <= 6; s++) {
+      var t2 = s / 6, u2 = 1 - t2;
+      samples.push({ x: u2 * u2 * a.x + 2 * u2 * t2 * p1.x + t2 * t2 * b.x,
+                     y: u2 * u2 * a.y + 2 * u2 * t2 * p1.y + t2 * t2 * b.y });
+    }
+  }
+  d += " L" + last.x + "," + last.y;
+  samples.push(last);
+  return { d: d, samples: samples };
+}
+
+function astarPath(grid, heat, a, b) {
+  var ca = cellOf(grid, a.x, a.y), cb = cellOf(grid, b.x, b.y);
+  var aC = nearestFree(grid, ca.i, ca.j), bC = nearestFree(grid, cb.i, cb.j);
+  var cells = astar(grid, heat, aC, bC);
+  if (!cells) return null;
+  var cps = simplify(grid, cells.map(function (c) { return cellCenter(c.i, c.j); }));
+  if (!cps.length) cps = [{ x: a.x, y: a.y }];
+  var pre = joinOrtho(a, cps[0], grid);
+  var post = joinOrtho(cps[cps.length - 1], b, grid);
+  if (pre === null || post === null) return null;
+  return (pre || []).concat(cps, post || []);
+}
+
+function claimLane(used, want, lo, hi) {
+  function free(x) {
+    if (x <= lo || x >= hi) return false;
+    for (var u = 0; u < used.length; u++) if (Math.abs(used[u] - x) < LANE_GAP) return false;
+    return true;
+  }
+  if (free(want)) return want;
+  for (var d = LANE_GAP; d < 1600; d += LANE_GAP) {
+    if (free(want + d)) return want + d;
+    if (free(want - d)) return want - d;
+  }
+  return want;
+}
+
+function routeTrunk(e, sp, tp, A, B, panels, bandOf, laneX, grid, heat) {
+  var sb = bandOf[e.from], tb = bandOf[e.to];
+  if (sb == null || tb == null || sb === tb || laneX == null) return null;
+  var down = tb > sb;
+  var pts = [sp], cur = A;
+  for (var p = Math.min(sb, tb); p < Math.max(sb, tb); p++) {
+    var pa = panels[down ? p : p + 1], pb = panels[down ? p + 1 : p];
+    if (!pa || !pb) return null;
+    var enter = { x: laneX, y: down ? pa.y2 - LANE_IN : pa.y + LANE_IN };
+    var leave = { x: laneX, y: down ? pb.y + LANE_IN : pb.y2 - LANE_IN };
+    var seg = astarPath(grid, heat, cur, enter);
+    if (!seg) return null;
+    pts = pts.concat(seg);
+    pts.push(leave);
+    cur = leave;
+  }
+  var tail = astarPath(grid, heat, cur, B);
+  if (!tail) return null;
+  pts = pts.concat(tail, [tp]);
+  return { pts: simplify(grid, dedupe(pts)), direct: false };
+}
+
+function stubOf(p, dir, panel) {
+  if (!panel) return STUB;
+  var room = dir[1] < 0 ? p.y - panel.y
+            : dir[1] > 0 ? panel.y2 - p.y
+            : dir[0] < 0 ? p.x - panel.x : panel.x2 - p.x;
+  return clamp(STUB, INFLATE + 1, Math.max(INFLATE + 1, room - INFLATE));
+}
+
+function routeEdge(edge, S, T, sp, tp, grid, heat, rects, A, B) {
+  var df = DIRV[edge.fs], dt = DIRV[edge.ts];
+  if (rects && directClear(rects, sp, tp, df, dt)) return { pts: [sp, tp], direct: true };
+  if (!A) A = { x: sp.x + df[0] * STUB, y: sp.y + df[1] * STUB };
+  if (!B) B = { x: tp.x + dt[0] * STUB, y: tp.y + dt[1] * STUB };
+  if (df[0] === -dt[0] && df[1] === -dt[1]) {
+    if (df[1] !== 0) {
+      var room = df[1] > 0 ? (B.y - A.y) : (A.y - B.y);
+      if (room < 4) {
+        var ym = df[1] > 0 ? (S.y2 + T.y) / 2 : (S.y + T.y2) / 2;
+        A.y = ym; B.y = ym;
+      }
+    } else {
+      var roomx = df[0] > 0 ? (B.x - A.x) : (A.x - B.x);
+      if (roomx < 4) {
+        var xm = df[0] > 0 ? (S.x2 + T.x) / 2 : (S.x + T.x2) / 2;
+        A.x = xm; B.x = xm;
+      }
+    }
+  }
+  var mids = [];
+  if (Math.abs(A.x - B.x) < 0.5 || Math.abs(A.y - B.y) < 0.5) mids.push([]);
+  mids.push([{ x: B.x, y: A.y }]);
+  mids.push([{ x: A.x, y: B.y }]);
+  mids.push([{ x: A.x, y: (A.y + B.y) / 2 }, { x: B.x, y: (A.y + B.y) / 2 }]);
+  mids.push([{ x: (A.x + B.x) / 2, y: A.y }, { x: (A.x + B.x) / 2, y: B.y }]);
+  var best = null;
+  mids.forEach(function (m) {
+    var mid = dedupe([A].concat(m, [B]));
+    if (polyBlocked(grid, mid)) return;
+    var score = (mid.length - 2) * BEND_W + polyLen(mid) + heatCost(grid, heat, mid) * 0.5;
+    if (!best || score < best.score) best = { score: score, route: mid };
+  });
+  var route;
+  if (best) route = best.route;
+  else {
+    var ca = cellOf(grid, A.x, A.y), cb = cellOf(grid, B.x, B.y);
+    var aC = nearestFree(grid, ca.i, ca.j), bC = nearestFree(grid, cb.i, cb.j);
+    var cells = astar(grid, heat, aC, bC);
+    if (cells) {
+      var cps = simplify(grid, cells.map(function (c) { return cellCenter(c.i, c.j); }));
+      var pre = joinOrtho(A, cps[0], grid);
+      var post = joinOrtho(cps[cps.length - 1], B, grid);
+      route = (pre || []).concat(cps, post || []);
+    } else route = [A, B];
+  }
+  return { pts: dedupe([sp, A].concat(route, [B, tp])), direct: false };
+}
+
+function computeSlots(edges, boxes) {
+  var out = {}, groups = {}, queue = [], budget = {};
+  function add(id, side, other, idx, end) {
+    var k = id + "|" + side;
+    if (!groups[k]) { groups[k] = []; queue.push({ id: id, side: side }); }
+    groups[k].push({ other: other, idx: idx, end: end });
+  }
+  edges.forEach(function (e, i) { add(e.from, e.fs, e.to, i, "sp"); add(e.to, e.ts, e.from, i, "tp"); });
+  while (queue.length) {
+    var job = queue.shift(), id = job.id, side = job.side, b = boxes[id];
+    var refs = groups[id + "|" + side];
+    if (!refs || !refs.length || !b) continue;
+    delete groups[id + "|" + side];
+    var vertical = side === "left" || side === "right";
+    var lo = vertical ? b.y : b.x, hi = vertical ? b.y2 : b.x2;
+    var inner = Math.max(0, (hi - lo) - 2 * CORNER);
+    var cap = Math.max(1, Math.floor(inner / MIN_PORT) + 1);
+    refs.sort(function (x, y) {
+      var ox = boxes[x.other], oy = boxes[y.other];
+      var d = vertical ? (ox.cy - oy.cy) : (ox.cx - oy.cx);
+      return d || (x.idx - y.idx);
+    });
+    var maySpill = refs.length > cap && (budget[id] || 0) > 0;
+    var keep = maySpill ? refs.slice(0, cap) : refs;
+    var spill = maySpill ? refs.slice(cap) : [];
+    if (maySpill) budget[id] = (budget[id] || 0) - 1;
+    var n = keep.length;
+    var pad = n > 1 ? Math.min(CORNER, Math.max(7, inner / (2 * n))) : CORNER;
+    var step = n > 1 ? Math.min(30, (hi - lo - 2 * pad) / (n - 1)) : 0;
+    var start = (lo + hi) / 2 - (n - 1) * step / 2;
+    var vals = [];
+    for (var k = 0; k < n; k++) {
+      var v = snapC(clamp(start + k * step, lo + pad, hi - pad));
+      vals.push(clamp(v, lo + 7, hi - 7));
+    }
+    for (var a = 1; a < vals.length; a++) {
+      var gap = Math.abs(vals[a] - vals[a - 1]);
+      if (gap < MIN_PORT) {
+        var push = (MIN_PORT - gap) / 2;
+        vals[a] = clamp(vals[a] + push, lo + pad, hi - pad);
+        vals[a - 1] = clamp(vals[a - 1] - push, lo + pad, hi - pad);
+      }
+    }
+    for (var m = 0; m < n; m++) {
+      var v2 = clamp(vals[m], lo + 6, hi - 6);
+      var p = side === "top" ? { x: v2, y: b.y }
+            : side === "bottom" ? { x: v2, y: b.y2 }
+            : side === "left" ? { x: b.x, y: v2 } : { x: b.x2, y: v2 };
+      out[keep[m].idx + "|" + keep[m].end] = p;
+    }
+    if (spill.length) {
+      var s1 = SIBLING[side], k1 = id + "|" + s1;
+      if (!groups[k1]) { groups[k1] = []; queue.push({ id: id, side: s1 }); }
+      spill.forEach(function (r) { groups[k1].push(r); });
+    }
+  }
+  return out;
+}
+
+var SIBLING = { top: "right", bottom: "right", left: "bottom", right: "bottom" };
+
+function routeAll(edges, boxes, W, H, ctx) {
+  var t0 = (typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now();
+  ctx = ctx || {};
+  var panels = ctx.panels || [], bandOf = ctx.bandOf || {};
+  var blockers = ctx.blockers || Object.keys(boxes).map(function (k) { return boxes[k]; });
+
+  edges.forEach(function (e) {
+    var sb = bandOf[e.from], tb = bandOf[e.to];
+    e.cross = !(sb == null || tb == null || sb === tb);
+    if (e.cross) {
+      var down = tb > sb;
+      e.fs = down ? "bottom" : "top";
+      e.ts = down ? "top" : "bottom";
+    }
+  });
+  var slots = computeSlots(edges, boxes);
+  var laneOf = {}, used = [], trunks = [];
+  edges.forEach(function (e, i) { if (e.cross) trunks.push(i); });
+  trunks.forEach(function (i) {
+    var sp = slots[i + "|sp"], tp = slots[i + "|tp"];
+    if (!sp || !tp) return;
+    laneOf[i] = claimLane(used, clamp((sp.x + tp.x) / 2, 26, W - 26), 26, W - 26);
+    used.push(laneOf[i]);
+  });
+  var gates = [];
+  Object.keys(laneOf).forEach(function (k) {
+    var i = +k, e = edges[i], sb = bandOf[e.from], tb = bandOf[e.to], x = laneOf[i];
+    for (var p = Math.min(sb, tb); p < Math.max(sb, tb); p++) {
+      if (!panels[p] || !panels[p + 1]) continue;
+      gates.push({ x: x - LANE_HALF, x2: x + LANE_HALF,
+                   y: panels[p].y2 - INFLATE - 2, y2: panels[p + 1].y + INFLATE + 2 });
+    }
+  });
+  var grid = buildGrid(W, H, blockers, gates);
+  var gridSealed = gates.length ? buildGrid(W, H, blockers, null) : grid;
+  var heat = new Float32Array(grid.cols * grid.rows);
+  var order = edges.map(function (e, i) {
+    var A = boxes[e.from], B = boxes[e.to];
+    return { i: i, d: Math.abs(A.cx - B.cx) + Math.abs(A.cy - B.cy) };
+  }).sort(function (a, b) {
+    return (edges[a.i].cross ? 0 : 1) - (edges[b.i].cross ? 0 : 1) || b.d - a.d || a.i - b.i;
+  });
+  var paths = new Array(edges.length);
+  order.forEach(function (o) {
+    var i = o.i, e = edges[i];
+    var sp = slots[i + "|sp"], tp = slots[i + "|tp"];
+    if (!sp || !tp) { paths[i] = { e: e, pts: [null, null] }; return; }
+    var df = DIRV[e.fs], dt = DIRV[e.ts];
+    var sp0 = panels[bandOf[e.from]], tp0 = panels[bandOf[e.to]];
+    var A = { x: sp.x + df[0] * stubOf(sp, df, sp0), y: sp.y + df[1] * stubOf(sp, df, sp0) };
+    var B = { x: tp.x + dt[0] * stubOf(tp, dt, tp0), y: tp.y + dt[1] * stubOf(tp, dt, tp0) };
+    var res = null;
+    if (e.cross) res = routeTrunk(e, sp, tp, A, B, panels, bandOf, laneOf[i], gridSealed, heat);
+    if (!res && !e.cross && directClear(blockers, sp, tp, df, dt)) res = { pts: [sp, tp], direct: true };
+    if (!res) res = routeEdge(e, boxes[e.from], boxes[e.to], sp, tp, grid, heat, blockers, A, B);
+    paths[i] = { e: e, pts: res.pts, sp: sp, tp: tp, direct: res.direct, lane: laneOf[i] };
+    stampHeat(grid, heat, res.pts);
+  });
+
+  var stats = { blocked: 0, crossings: 0, near: 0, trunks: trunks.length, bad: [], badWhy: {} };
+  var nearPairs = {};
+  var segs = [];
+  paths.forEach(function (r) {
+    if (!r.sp) return;
+    var g = edgeGeom(r, blockers);
+    r.d = g.d;
+    r.samples = g.samples;
+    var tag = r.e.from + "→" + r.e.to, flagged = false, why = "";
+    for (var i = 0; i + 1 < g.samples.length && !flagged; i++) {
+      var a = g.samples[i], b = g.samples[i + 1];
+      var steps = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / 4));
+      for (var s = 0; s <= steps && !flagged; s++) {
+        var u = s / steps;
+        var p = { x: a.x + (b.x - a.x) * u, y: a.y + (b.y - a.y) * u };
+        if (Math.hypot(p.x - r.sp.x, p.y - r.sp.y) < CLEAR + 4) continue;
+        if (Math.hypot(p.x - r.tp.x, p.y - r.tp.y) < CLEAR + 4) continue;
+        for (var k = 0; k < blockers.length; k++) {
+          var q = blockers[k], d = clearDist(p, q);
+          if (q.panel) {
+            if (d < 1.5 && (r.lane == null || Math.abs(p.x - r.lane) > LANE_HALF + 3)) {
+              flagged = true; why = "压面板边框（非轨道口）";
+            }
+          } else if (d < CLEAR) {
+            flagged = true; why = "压框 " + (q.id || "标题/屏障");
+          } else if (d < CLEAR + 5) nearPairs[tag + "|" + (q.id || "?")] = 1;
+        }
+      }
+    }
+    if (flagged) {
+      stats.blocked++;
+      stats.badWhy[tag] = why;
+      if (stats.bad.indexOf(tag) < 0) stats.bad.push(tag);
+    }
+    for (var j = 0; j + 1 < g.samples.length; j++) segs.push([g.samples[j], g.samples[j + 1], i]);
+  });
+  for (var a = 0; a < segs.length; a++) {
+    for (var b = a + 1; b < segs.length; b++) {
+      if (segs[a][2] === segs[b][2]) continue;
+      if (segCross(segs[a][0], segs[a][1], segs[b][0], segs[b][1])) stats.crossings++;
+      else if (parallelNear(segs[a], segs[b])) nearPairs["p" + a + "|" + b] = 1;
+    }
+  }
+  stats.near = Object.keys(nearPairs).length;
+  stats.ms = Math.round(((typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now()) - t0);
+  return { paths: paths, stats: stats, slots: slots, lanes: laneOf };
+}
+
+function labelSpots(pts) {
+  var out = [];
+  if (pts.length < 2) return [{ x: 0, y: -20, anchor: "middle", vert: false }];
+  var total = polyLen(pts), fr = [0.35, 0.5, 0.2, 0.65, 0.8, 0.05];
+  for (var f = 0; f < fr.length; f++) {
+    var target = total * fr[f], acc = 0;
+    for (var i = 0; i + 1 < pts.length; i++) {
+      var a = pts[i], b = pts[i + 1], L = segLen(a, b);
+      if (L > 6 && acc + L >= target) {
+        var t = (target - acc) / L;
+        var x = a.x + (b.x - a.x) * t, y = a.y + (b.y - a.y) * t;
+        if (Math.abs(a.y - b.y) < 0.5) {
+          out.push({ x: x, y: y - 7, anchor: "middle", vert: false });
+          out.push({ x: x + 7, y: y + 3.5, anchor: "start", vert: true });
+        } else {
+          out.push({ x: x + 7, y: y + 3.5, anchor: "start", vert: true });
+          out.push({ x: x, y: y - 7, anchor: "middle", vert: false });
+        }
+        break;
+      }
+      acc += L;
+    }
+  }
+  if (!out.length) out.push({ x: pts[0].x, y: pts[0].y - 7, anchor: "middle", vert: false });
+  return out;
+}
+
+var EDGES = [
+  { from: "c-key", to: "c-dfetch", style: "impl", fs: "right", ts: "left" },
+  { from: "c-key", to: "c-eiajson", style: "ephem", fs: "bottom", ts: "left", label: "树外抓取" },
+  { from: "c-dfetch", to: "c-cache", style: "impl", fs: "right", ts: "left", label: "直拉写缓存" },
+  { from: "c-eiajson", to: "c-assemble", style: "ephem", fs: "right", ts: "left" },
+  { from: "c-assemble", to: "c-cache", style: "impl", fs: "right", ts: "left" },
+  { from: "c-cache", to: "c-prep", style: "impl", fs: "bottom", ts: "top", label: "prepare_data() 读取（缓存优先）" },
+  { from: "c-prep", to: "c-train", style: "impl", fs: "right", ts: "left", label: "时序切分 30/13 月" },
+  { from: "c-prep", to: "c-valid", style: "impl", fs: "right", ts: "left" },
+  { from: "c-train", to: "c-runlog", style: "impl", fs: "right", ts: "left", label: "grep 锚点" },
+  { from: "c-valid", to: "c-runlog", style: "impl", fs: "right", ts: "left", label: "算 MASE/coverage" },
+  { from: "c-cache", to: "c-fitr", style: "impl", fs: "bottom", ts: "top", label: "全量重训（越界 · 受 gate 约束）" },
+  { from: "c-fitr", to: "c-fitrd", style: "impl", fs: "right", ts: "left", label: "saveRDS" },
+  { from: "c-a2", to: "c-a1", style: "impl", fs: "top", ts: "bottom", label: "ZIP→utility 映射（join）" },
+  { from: "c-a2", to: "c-a3", style: "plan", fs: "top", ts: "bottom", label: "eiaid 检索" },
+  { from: "c-a1", to: "c-f1", style: "impl", fs: "bottom", ts: "top", label: "年度价格数值" },
+  { from: "c-a2", to: "c-f1", style: "impl", fs: "bottom", ts: "top", label: "ZIP→state 通路" },
+  { from: "c-a2", to: "c-f3", style: "impl", fs: "bottom", ts: "top", label: "州向" },
+  { from: "c-g1", to: "c-d1a", style: "gap", fs: "bottom", ts: "top", label: "county→ZCTA 聚合（纸面）" },
+  { from: "c-e1", to: "c-f4", style: "plan", fs: "bottom", ts: "top", label: "患病率横截面（35 项）" },
+  { from: "c-d1a", to: "c-f5", style: "plan", fs: "bottom", ts: "top", label: "YPLL 分解" },
+  { from: "c-d1b", to: "c-f3", style: "plan", fs: "bottom", ts: "top", label: "标签（未接线）" },
+  { from: "c-d2", to: "c-f3", style: "impl", fs: "bottom", ts: "top", label: "LE 锚（vendored 78.4/79.0）" },
+  { from: "c-c1", to: "c-f3", style: "impl", fs: "bottom", ts: "top", label: "机制列 c1_*（exp#39）" },
+  { from: "c-vsrr", to: "c-f2", style: "impl", fs: "bottom", ts: "top", label: "死亡率面板（合成输入）" },
+  { from: "c-d2", to: "c-f2", style: "impl", fs: "bottom", ts: "top", label: "LE 锚（Δe1 移植）" },
+  { from: "c-vsrr", to: "c-f3", style: "reuse", fs: "right", ts: "top", label: "同数据面（未接线）" },
+  { from: "c-bill", to: "c-f3", style: "impl", fs: "bottom", ts: "top", label: "贝叶斯证据" },
+  { from: "c-cache", to: "c-f1", style: "impl", fs: "right", ts: "bottom", label: "B1 cache mom 序列" },
+  { from: "c-fitrd", to: "c-f3", style: "impl", fs: "right", ts: "bottom", label: "price_draws（预测 regime）" },
+  { from: "c-cache", to: "c-f3", style: "impl", fs: "right", ts: "bottom", label: "bill÷price 反推用量" }
+];
+
+var STYLE = {
+  impl: { stroke: "#1565C0", dash: "", width: 2 },
+  plan: { stroke: "#EF6C00", dash: "7 5", width: 1.8 },
+  gap: { stroke: "#E65100", dash: "2 4", width: 1.8 },
+  reuse: { stroke: "#78909C", dash: "2 4", width: 1.6 },
+  ephem: { stroke: "#78909C", dash: "7 5", width: 1.6 }
+};
+var TRUNK_W = 2.6, INNER_W = 1.5;
+
+function init() {
+  var diagram = document.getElementById("diagram");
+  var svg = document.getElementById("edgeLayer");
+  var selfcheck = document.getElementById("selfcheck");
+  var toggle = document.getElementById("labelsToggle");
+  var trunkToggle = document.getElementById("trunkToggle");
+  var hint = document.getElementById("edgeHint");
+  var NS = "http://www.w3.org/2000/svg";
+  var routes = [], pin = null, focusBand = -1, lastHint = { x: 24, y: 24 };
+  var bandList = diagram.querySelectorAll(".band");
+
+  function makeDefs() {
+    var defs = document.createElementNS(NS, "defs");
+    svg.appendChild(defs);
+    Object.keys(STYLE).forEach(function (k) {
+      var st = STYLE[k];
+      var mk = document.createElementNS(NS, "marker");
+      mk.setAttribute("id", "arr-" + k);
+      mk.setAttribute("viewBox", "0 0 10 10");
+      mk.setAttribute("refX", "9"); mk.setAttribute("refY", "5");
+      mk.setAttribute("markerWidth", "7"); mk.setAttribute("markerHeight", "7");
+      mk.setAttribute("orient", "auto-start-reverse");
+      var p = document.createElementNS(NS, "path");
+      p.setAttribute("d", "M0,0 L10,5 L0,10 z");
+      p.setAttribute("fill", st.stroke);
+      mk.appendChild(p);
+      defs.appendChild(mk);
+    });
+  }
+
+  function render() {
+    var dRect = diagram.getBoundingClientRect();
+    var W = diagram.clientWidth, H = diagram.scrollHeight;
+    svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+    svg.setAttribute("width", W);
+    svg.setAttribute("height", H);
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+
+    var bandEls = diagram.querySelectorAll(".band");
+    var panels = [], bandOf = {};
+    Array.prototype.forEach.call(bandEls, function (el, bi) {
+      var r = el.getBoundingClientRect();
+      panels.push({ x: r.left - dRect.left, y: r.top - dRect.top,
+                    x2: r.right - dRect.left, y2: r.bottom - dRect.top,
+                    panel: true, id: "band" + (bi + 1) });
+    });
+    var ids = {};
+    EDGES.forEach(function (e) { ids[e.from] = 1; ids[e.to] = 1; });
+    var boxes = {};
+    Object.keys(ids).forEach(function (id) {
+      var el = document.getElementById(id);
+      var r = el.getBoundingClientRect();
+      var b = {
+        id: id,
+        x: r.left - dRect.left, y: r.top - dRect.top,
+        x2: r.right - dRect.left, y2: r.bottom - dRect.top
+      };
+      b.cx = (b.x + b.x2) / 2; b.cy = (b.y + b.y2) / 2;
+      boxes[id] = b;
+      var host = el.closest ? el.closest(".band") : null;
+      bandOf[id] = host ? Array.prototype.indexOf.call(bandEls, host) : -1;
+    });
+    var blockers = panels.slice();
+    Array.prototype.forEach.call(diagram.querySelectorAll(".group h4, .band-h4, .barrier"), function (el) {
+      var r = el.getBoundingClientRect();
+      blockers.push({ x: r.left - dRect.left, y: r.top - dRect.top,
+                      x2: r.right - dRect.left, y2: r.bottom - dRect.top, id: "标题" });
+    });
+
+    var res = routeAll(EDGES, boxes, W, H, { panels: panels, bandOf: bandOf, blockers: blockers });
+    routes = res.paths;
+
+    makeDefs();
+    var labels = [];
+    routes.forEach(function (r, idx) {
+      var e = r.e, st = STYLE[e.style];
+      if (!r.sp) return;
+      var trunk = !!e.cross;
+      var cls = "edge" + (trunk ? " trunk" : "");
+      var halo = document.createElementNS(NS, "path");
+      halo.setAttribute("d", r.d);
+      halo.setAttribute("class", cls + " halo");
+      halo.setAttribute("stroke-width", (trunk ? TRUNK_W : INNER_W) + 3.4);
+      halo.setAttribute("data-idx", idx);
+      halo.setAttribute("data-from", e.from);
+      halo.setAttribute("data-to", e.to);
+      svg.appendChild(halo);
+
+      var path = document.createElementNS(NS, "path");
+      path.setAttribute("d", r.d);
+      path.setAttribute("fill", "none");
+      path.setAttribute("stroke", st.stroke);
+      path.setAttribute("stroke-width", trunk ? TRUNK_W : INNER_W);
+      path.setAttribute("opacity", trunk ? 1 : 0.92);
+      if (st.dash) path.setAttribute("stroke-dasharray", st.dash);
+      path.setAttribute("stroke-linejoin", "round");
+      path.setAttribute("stroke-linecap", "round");
+      path.setAttribute("marker-end", "url(#arr-" + e.style + ")");
+      path.setAttribute("class", cls);
+      path.setAttribute("data-idx", idx);
+      path.setAttribute("data-from", e.from);
+      path.setAttribute("data-to", e.to);
+      svg.appendChild(path);
+
+      var dot = document.createElementNS(NS, "circle");
+      dot.setAttribute("cx", r.sp.x);
+      dot.setAttribute("cy", r.sp.y);
+      dot.setAttribute("r", trunk ? "2.8" : "2.2");
+      dot.setAttribute("fill", st.stroke);
+      dot.setAttribute("class", cls);
+      dot.setAttribute("data-idx", idx);
+      dot.setAttribute("data-from", e.from);
+      dot.setAttribute("data-to", e.to);
+      svg.appendChild(dot);
+
+      if (e.label) {
+        var spots = labelSpots(r.samples);
+        var t = document.createElementNS(NS, "text");
+        t.setAttribute("x", spots[0].x);
+        t.setAttribute("y", spots[0].y);
+        t.setAttribute("text-anchor", spots[0].anchor);
+        t.setAttribute("font-size", "10.5");
+        t.setAttribute("fill", "#37474F");
+        t.setAttribute("paint-order", "stroke");
+        t.setAttribute("stroke", "#FFFFFF");
+        t.setAttribute("stroke-width", "3.5");
+        t.setAttribute("stroke-linejoin", "round");
+        t.setAttribute("class", cls);
+        t.setAttribute("data-idx", idx);
+        t.setAttribute("data-from", e.from);
+        t.setAttribute("data-to", e.to);
+        t.textContent = e.label;
+        svg.appendChild(t);
+        labels.push({ el: t, spots: spots, idx: idx });
+      }
+    });
+
+    var labelObstacles = Object.keys(boxes).map(function (k) { return boxes[k]; });
+    Array.prototype.forEach.call(diagram.querySelectorAll(".band > h3, .group h4, .band-h4, .barrier"),
+      function (el) {
+        var r = el.getBoundingClientRect();
+        labelObstacles.push({
+          x: r.left - dRect.left, y: r.top - dRect.top,
+          x2: r.right - dRect.left, y2: r.bottom - dRect.top
+        });
+      });
+    var labelRes = resolveLabels(labels, labelObstacles);
+
+    var tally = {};
+    EDGES.forEach(function (e) {
+      var sb = bandOf[e.from], tb = bandOf[e.to];
+      if (sb < 0 || tb < 0) return;
+      var t = tally[sb] || (tally[sb] = { inner: 0, out: 0, in: 0 });
+      if (sb === tb) t.inner++;
+      else {
+        t.out++;
+        var t2 = tally[tb] || (tally[tb] = { inner: 0, out: 0, in: 0 });
+        t2.in++;
+      }
+    });
+    Array.prototype.forEach.call(bandEls, function (el, bi) {
+      var m = el.querySelector(".bh-meta"), t = tally[bi];
+      if (!m) return;
+      m.textContent = t ? ("带内 " + t.inner + " · 出 " + t.out + " · 入 " + t.in) : "无连线";
+    });
+
+    selfcheck.textContent = "路由自检：" + res.stats.blocked + " 穿框 · " + res.stats.crossings +
+      " 交叉 · " + res.stats.near + " 近贴 · " + labelRes.count + " 标签重叠 · 主干轨道 " +
+      res.stats.trunks + " · " + res.stats.ms + "ms";
+    selfcheck.className = "selfcheck " + (res.stats.blocked === 0 && labelRes.count === 0 ? "ok" : "bad");
+    var notes = [];
+    if (res.stats.bad.length) {
+      notes.push("穿框：" + res.stats.bad.map(function (t) {
+        return t + "（" + (res.stats.badWhy[t] || "") + "）";
+      }).join("，"));
+    }
+    if (labelRes.list.length) notes.push("标签重叠：" + labelRes.list.join("，"));
+    selfcheck.title = notes.join("；") || "无穿框";
+    applyBandFocus();
+    if (pin != null && pin < routes.length) focusEdge(pin); else clearFocus();
+  }
+
+  function resolveLabels(labels, obstacles) {
+    var cards = obstacles;
+    var placed = [], bad = 0, badList = [];
+    var offs = [[0, 0], [0, -6], [0, 6], [0, -13], [0, 13], [0, -26], [0, 26], [0, -39],
+                [0, 39], [-16, 0], [16, 0], [-32, 0], [32, 0], [-48, 0], [48, 0],
+                [0, -52], [0, 52], [0, -65], [0, 65], [-64, 0], [64, 0]];
+    function countHits(b) {
+      var hits = 0;
+      for (var p = 0; p < cards.length; p++) {
+        var q = cards[p];
+        if (!(b.x2 < q.x || b.x > q.x2 || b.y2 < q.y || b.y > q.y2)) hits++;
+      }
+      for (var p2 = 0; p2 < placed.length; p2++) {
+        var z = placed[p2];
+        if (!(b.x2 < z.x || b.x > z.x2 || b.y2 < z.y || b.y > z.y2)) hits++;
+      }
+      return hits;
+    }
+    function boxAt(x, y, anchor, w, h) {
+      var bx = anchor === "middle" ? x - w / 2 : x;
+      var by = y - h + 2;
+      return { x: bx - 2, y: by - 2, x2: bx + w + 2, y2: by + h + 2 };
+    }
+    labels.forEach(function (L) {
+      var el = L.el, bb = el.getBBox(), w = bb.width, h = bb.height;
+      var offs2 = offs.concat([[-w - 18, 0], [-w - 46, 0], [w + 18, 0], [w + 46, 0],
+                               [-w - 18, -13], [-w - 18, 13]]);
+      var best = null;
+      L.spots.forEach(function (sp) {
+        offs2.forEach(function (off) {
+          if (best && best.hits === 0) return;
+          var x = sp.x + off[0], y = sp.y + off[1];
+          var b = boxAt(x, y, sp.anchor, w, h);
+          var hits = countHits(b);
+          if (!best || hits < best.hits) best = { hits: hits, box: b, x: x, y: y, anchor: sp.anchor };
+        });
+      });
+      if (best && best.hits > 0) {
+        var seed = best;
+        for (var r = 18; r <= 300 && best.hits > 0; r += 18) {
+          for (var aa = 0; aa < 16 && best.hits > 0; aa++) {
+            var ang = aa * Math.PI / 8;
+            var x = clamp(seed.x + Math.cos(ang) * r, 6, 1e6);
+            var y = seed.y + Math.sin(ang) * r;
+            var b = boxAt(x, y, seed.anchor, w, h);
+            var hits = countHits(b);
+            if (hits < best.hits) best = { hits: hits, box: b, x: x, y: y, anchor: seed.anchor };
+          }
+        }
+      }
+      if (best) {
+        el.setAttribute("x", best.x);
+        el.setAttribute("y", best.y);
+        placed.push(best.box);
+        if (best.hits > 0) { bad++; badList.push(EDGES[L.idx].label); }
+      } else { bad++; badList.push(EDGES[L.idx].label); }
+    });
+    return { count: bad, list: badList };
+  }
+
+  function hitEdge(x, y) {
+    var best = null;
+    routes.forEach(function (r, idx) {
+      for (var i = 0; i + 1 < r.samples.length; i++) {
+        var d = pointSegDist({ x: x, y: y }, r.samples[i], r.samples[i + 1]);
+        if (d < 9 && (!best || d < best.d)) best = { idx: idx, d: d };
+      }
+    });
+    return best ? best.idx : -1;
+  }
+  function setEdgeOn(idx) {
+    Array.prototype.forEach.call(svg.querySelectorAll(".edge"), function (el) {
+      el.classList.toggle("on", +el.getAttribute("data-idx") === idx);
+    });
+  }
+  function showHint(idx, cx, cy) {
+    var e = EDGES[idx];
+    if (cx == null) { cx = lastHint.x; cy = lastHint.y; }
+    lastHint = { x: cx, y: cy };
+    var ft = document.querySelector("#" + e.from + " .t");
+    var tt = document.querySelector("#" + e.to + " .t");
+    hint.textContent = (ft ? ft.textContent : e.from) + "  →  " + (tt ? tt.textContent : e.to) +
+      (e.label ? " · " + e.label : "");
+    hint.style.display = "block";
+    var W = diagram.clientWidth, H = diagram.scrollHeight;
+    hint.style.left = clamp(cx + 14, 4, Math.max(4, W - hint.offsetWidth - 8)) + "px";
+    hint.style.top = clamp(cy + 14, 4, Math.max(4, H - hint.offsetHeight - 8)) + "px";
+  }
+  function focusEdge(idx, cx, cy) {
+    diagram.classList.add("focusing");
+    setEdgeOn(idx);
+    var e = EDGES[idx];
+    Array.prototype.forEach.call(diagram.querySelectorAll(".card"), function (el) {
+      el.classList.toggle("hl", el.id === e.from || el.id === e.to);
+    });
+    showHint(idx, cx, cy);
+    diagram.style.cursor = "pointer";
+  }
+  function focusCard(id) {
+    diagram.classList.add("focusing");
+    Array.prototype.forEach.call(svg.querySelectorAll(".edge"), function (el) {
+      var on = el.getAttribute("data-from") === id || el.getAttribute("data-to") === id;
+      el.classList.toggle("on", on);
+    });
+    Array.prototype.forEach.call(diagram.querySelectorAll(".card"), function (el) {
+      el.classList.toggle("hl", el.id === id);
+    });
+    hint.style.display = "none";
+  }
+  function hostBand(id) {
+    var el = document.getElementById(id);
+    var host = el && el.closest ? el.closest(".band") : null;
+    return host ? Array.prototype.indexOf.call(bandList, host) : -1;
+  }
+  function applyBandFocus() {
+    Array.prototype.forEach.call(bandList, function (el, i) {
+      el.classList.toggle("on", i === focusBand);
+    });
+    Array.prototype.forEach.call(svg.querySelectorAll(".edge"), function (el) {
+      var on = focusBand >= 0 &&
+        (hostBand(el.getAttribute("data-from")) === focusBand || hostBand(el.getAttribute("data-to")) === focusBand);
+      el.classList.toggle("on", on);
+    });
+    diagram.classList.toggle("band-focus", focusBand >= 0);
+  }
+  function clearFocus() {
+    diagram.classList.remove("focusing");
+    Array.prototype.forEach.call(svg.querySelectorAll(".edge"), function (el) { el.classList.remove("on"); });
+    Array.prototype.forEach.call(diagram.querySelectorAll(".card"), function (el) { el.classList.remove("hl"); });
+    hint.style.display = "none";
+    diagram.style.cursor = "default";
+    if (focusBand >= 0) applyBandFocus();
+  }
+  Array.prototype.forEach.call(diagram.querySelectorAll(".card"), function (el) {
+    el.addEventListener("mouseenter", function () { focusCard(el.id); });
+    el.addEventListener("mouseleave", function () {
+      if (pin != null) focusEdge(pin); else clearFocus();
+    });
+  });
+  Array.prototype.forEach.call(diagram.querySelectorAll(".band > h3"), function (el, bi) {
+    el.addEventListener("click", function (ev) {
+      ev.stopPropagation();
+      focusBand = (focusBand === bi) ? -1 : bi;
+      if (pin != null) { pin = null; clearFocus(); } else applyBandFocus();
+    });
+  });
+  var hoverRaf = false, hoverPt = null;
+  diagram.addEventListener("mousemove", function (ev) {
+    if (pin != null) return;
+    if (ev.target && ev.target.closest && ev.target.closest(".card")) return;
+    var dRect = diagram.getBoundingClientRect();
+    hoverPt = { x: ev.clientX - dRect.left, y: ev.clientY - dRect.top };
+    if (hoverRaf) return;
+    hoverRaf = true;
+    requestAnimationFrame(function () {
+      hoverRaf = false;
+      if (!hoverPt) return;
+      var idx = hitEdge(hoverPt.x, hoverPt.y);
+      if (idx >= 0) focusEdge(idx, hoverPt.x, hoverPt.y);
+      else clearFocus();
+    });
+  });
+  diagram.addEventListener("mouseleave", function () {
+    hoverPt = null;
+    if (pin != null) focusEdge(pin); else clearFocus();
+  });
+  diagram.addEventListener("click", function (ev) {
+    if (ev.target && ev.target.closest && ev.target.closest(".card")) return;
+    var dRect = diagram.getBoundingClientRect();
+    var x = ev.clientX - dRect.left, y = ev.clientY - dRect.top;
+    var idx = hitEdge(x, y);
+    if (idx >= 0) {
+      pin = (pin === idx) ? null : idx;
+      if (pin == null) clearFocus(); else focusEdge(idx, x, y);
+    } else if (pin != null) {
+      pin = null;
+      clearFocus();
+    }
+  });
+  document.addEventListener("keydown", function (ev) {
+    if (ev.key !== "Escape") return;
+    if (focusBand >= 0) { focusBand = -1; applyBandFocus(); }
+    if (pin != null) { pin = null; clearFocus(); }
+  });
+  if (trunkToggle) {
+    if (location.hash.indexOf("all=1") >= 0) trunkToggle.checked = false;
+    diagram.classList.toggle("trunk-only", trunkToggle.checked);
+    trunkToggle.addEventListener("change", function () {
+      diagram.classList.toggle("trunk-only", trunkToggle.checked);
+    });
+  }
+  if (toggle) {
+    if (location.hash.indexOf("labels=on") >= 0) {
+      toggle.checked = true;
+      diagram.classList.add("labels-on");
+    }
+    toggle.addEventListener("change", function () {
+      diagram.classList.toggle("labels-on", toggle.checked);
+    });
+  }
+
+  render();
+  var timer = null;
+  window.addEventListener("resize", function () {
+    clearTimeout(timer);
+    timer = setTimeout(render, 150);
+  });
+  if (window.ResizeObserver) {
+    var ro = new ResizeObserver(function () {
+      clearTimeout(timer);
+      timer = setTimeout(render, 150);
+    });
+    ro.observe(diagram);
+  }
+}
+
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = { routeAll: routeAll, routeEdge: routeEdge, routeTrunk: routeTrunk,
+    computeSlots: computeSlots, buildGrid: buildGrid, dedupe: dedupe, polyLen: polyLen,
+    segCross: segCross, pointSegDist: pointSegDist, labelSpots: labelSpots,
+    distRect: distRect, clearDist: clearDist, astarPath: astarPath,
+    EDGES: EDGES, CLEAR: CLEAR, CELL: CELL };
+} else if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", init);
+} else {
+  init();
+}
+</script>
+</main>
+</body>
+</html>
