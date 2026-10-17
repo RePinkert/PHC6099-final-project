@@ -3,12 +3,17 @@
 # 数值契约用 expect_equal 对账内部层（避免写出两份同一数字）。
 # 按对外函数分片落地：每片只带自己那部分的场景，用例标题沿用全量编号。
 
-test_that("scenario 6: 年度 ZIP 价（A1 x A2 客户加权）", {
+test_that("scenario 6: 年度 ZIP 价与同比（A1 x A2 客户加权）", {
   a <- electricity_price(anchor_zip_fl, year = 2024)
   expect_equal(a$price, .zip_annual_price(anchor_zip_fl, 2024)$price)
   expect_equal(a$regime, "observed")
   expect_false(a$provisional)
   expect_equal(a$mapping_vintage, "2024")
+  ty <- electricity_price_trend(anchor_zip_fl, period = "yoy")
+  expect_equal(ty$year, c(2024L, 2025L))
+  p23 <- .zip_annual_price(anchor_zip_fl, 2023)$price
+  p24 <- .zip_annual_price(anchor_zip_fl, 2024)$price
+  expect_equal(ty$change[1], p24 - p23, tolerance = 1e-9)
 })
 
 test_that("scenario 7: 逐月序列（mom 43 行，provisional 分界 2025-01）", {
