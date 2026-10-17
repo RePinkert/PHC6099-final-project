@@ -3,6 +3,7 @@
 export(electricity_price)
 export(electricity_price_trend)
 export(expected_life_loss)
+export(health_measure)
 export(life_expectancy)
 export(life_expectancy_trend)
 export(my_electricity)
