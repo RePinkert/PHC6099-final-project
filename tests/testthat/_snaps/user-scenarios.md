@@ -40,6 +40,14 @@
 ---
 
     Code
+      tryCatch(life_expectancy(anchor_zip_fl, quarter = "2024-06"), error = function(
+        e) e)$message
+    Output
+      [1] "Invalid quarter: 2024-06 (expects YYYY-Qn)."
+
+---
+
+    Code
       tryCatch(electricity_price(anchor_zip_fl), error = function(e) e)$message
     Output
       [1] "Provide either year (2023-2025 annual ZIP-level) or period = \"mom\" (state monthly series)."

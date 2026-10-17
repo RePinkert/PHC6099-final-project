@@ -40,6 +40,11 @@ expected_life_loss("32601", "2026-09", delta_le = 0.01)
 # price at a time point + bill as Bayesian evidence
 my_electricity("32601", bill = 180, time = "2026-12")
 my_electricity("32601", bill = 180, usage = 1200, time = "2026-12")
+
+# synthetic life expectancy (mortality-based D1b/D2 sensitivity synthesis;
+# estimate_type labels it -- not an NCHS-published subnational value)
+life_expectancy("32601")
+life_expectancy("32601", quarter = "2024Q4")
 ```
 
 Every row carries provenance columns (`source`, `level`, `degraded_from`,
@@ -63,16 +68,29 @@ A bill is treated as evidence, not as an input you owe: on its own it yields
 implied usage; with usage it forms a local price measurement that tightens the
 forecast's interval. EIA-112 disconnection rates ride along for 2024.
 
-The synthetic life-expectancy estimate (`life_expectancy`,
-`life_expectancy_trend`) lands in later slices of this distribution.
+The synthetic life-expectancy estimate (`life_expectancy_trend`) lands in the
+next slice.
 
 `my_electricity()` is the same engine without the life columns: if you only want
 the energy picture, nothing about the elasticity contract leaks into it.
 
+## Life expectancy: a synthetic estimate
+
+`life_expectancy()` returns a **synthetic** estimate built from state mortality
+rates (NCHS VSRR provisional) plus the published national life-table anchor
+(NCHS e0): the state's mortality index is applied to the national age pattern
+through an abridged life table. Every assumption (state age pattern = national,
+life-table conventions, delta_e1 portability) is declared in the
+`sensitivity_assumption` column, and the `estimate_type` label states plainly
+that this is not an NCHS-published subnational life expectancy. Premature-
+mortality metrics (YPLL-75 proxy, pre-75 death share) ride along in the same
+row.
+
 ## Scope notes
 
-- `life_expectancy()` / `life_expectancy_trend()` are still stubs on this branch
-  and refuse to run; do not call them yet.
+- `life_expectancy_trend()` is still a stub on this branch and refuses to run.
+- The mortality source is quarterly, so its trend periods will be `"yoy"` /
+  `"qoq"`; `"mom"` does not exist for it.
 - EIA-112 disconnection data covers 2024 only; outside that window the columns
   are NA with a note saying so.
 - Model development records live in `autoresearch/` (not shipped in the package).
