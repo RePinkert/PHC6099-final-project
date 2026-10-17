@@ -13,10 +13,16 @@ knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
 
 ## Overview
 
-`lifewatt` maps a US ZIP code to environmental justice indicators.
+`lifewatt` maps a US ZIP code to environmental justice indicators:
 
-This branch is released one public function at a time. All six public
-functions are now in place.
+- residential electricity price estimates (observed EIA-861 annual ZIP-level
+  and EIA B1 state monthly series) with YoY / MoM trends;
+- bill-as-evidence price views;
+- an expected life-expectancy loss view anchored to published national life
+  tables (NCHS), with any life-expectancy translation declared as a
+  caller-supplied sensitivity parameter;
+- a synthetic life-expectancy estimate (state mortality rates + national
+  life-table anchor; every assumption declared in `sensitivity_assumption`).
 
 ## Workflow
 
@@ -41,11 +47,6 @@ my_electricity("32601", bill = 180, usage = 1200, time = "2026-12")
 expected_life_loss("32601", "2026-07")
 expected_life_loss("32601", "2026-12", bill = 180, usage = 1200)
 expected_life_loss("32601", "2026-09", delta_le = 0.01)
-
-# synthetic life expectancy
-life_expectancy("32601")
-life_expectancy("32601", quarter = "2024Q4")
-life_expectancy_trend("32601", period = "yoy")
 ```
 
 ## Provenance and honesty contract
@@ -53,20 +54,20 @@ life_expectancy_trend("32601", period = "yoy")
 Every returned row carries provenance columns (`source`, `level`,
 `degraded_from`, `mapping_vintage`, `provisional`). Prices are state-level
 estimates for the utility territory the OpenEI 2024 mapping assigns to the ZIP.
-The annual figure is a residential-customer-weighted blend of EIA-861 utility
-prices over the mapped utilities; months from 2025-01 onward are provisional and
-flagged; months after 2026-07 are served by a validated phase-B triplet
-forecast (`fit_as_of = 2026-07`).
+Months from 2025-01 onward are provisional and flagged; months after 2026-07
+are served by a validated phase-B triplet forecast (`fit_as_of = 2026-07`).
 
 `delta_le` is a declared sensitivity parameter, not a sourced elasticity: the
-output labels it in a `sensitivity_assumption` column and withholds the loss
-columns when it is absent. Without `delta_le` the life-loss columns are NA.
+output labels it in a `sensitivity_assumption` column. Without `delta_le` the
+life-loss columns are withheld. `life_expectancy()` / `life_expectancy_trend()`
+return **synthetic** estimates (mortality-based D1b/D2 sensitivity synthesis);
+the `estimate_type` label states they are not NCHS-published subnational life
+expectancies, and all synthesis assumptions travel in `sensitivity_assumption`.
+The mortality source is quarterly (NCHS VSRR provisional), so trend periods are
+`"yoy"` / `"qoq"` — `"mom"` is refused honestly.
 
-`life_expectancy()` returns a **synthetic** estimate: state mortality rates
-(NCHS VSRR provisional) applied to the national age pattern and anchored to the
-published NCHS e0. Every assumption is declared in `sensitivity_assumption`, and
-the `estimate_type` label states that this is not an NCHS-published subnational
-life expectancy. Premature-mortality metrics (YPLL-75 proxy, pre-75 death share)
-ride along in the same row. `life_expectancy_trend()` reports quarter-over-period
-change (`"yoy"` / `"qoq"`); the mortality source is quarterly, so `"mom"` is
-refused honestly.
+```{r eval = FALSE}
+life_expectancy("32601")
+life_expectancy("32601", quarter = "2024Q4")
+life_expectancy_trend("32601", period = "yoy")
+```

@@ -4,10 +4,15 @@ Version: 0.0.0.9000
 Authors@R: 
     person("Your", "Name", , "you@example.com", role = c("aut", "cre"))
 Description: Provides ZIP-code-level access to environmental justice
-    indicators, including area-average residential electricity prices and
-    their year-over-year and month-over-month trends, and average life
-    expectancy together with its year-over-year and month-over-month trends.
-    Placeholder skeleton; implementations to be added.
+    indicators, including area-average residential electricity prices
+    (observed EIA-861 annual and state monthly series with a validated
+    forecast beyond the observed window), their year-over-year and
+    month-over-month trends, and bill-based price evidence. Includes an
+    expected life-expectancy loss view anchored to published national life
+    tables, with any life-expectancy translation declared as a sensitivity
+    parameter until a sourced elasticity exists, and a synthetic
+    life-expectancy estimate built from state mortality rates whose assumptions
+    are declared in the output.
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
