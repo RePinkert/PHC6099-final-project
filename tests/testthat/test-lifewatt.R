@@ -1,6 +1,7 @@
 test_that("public functions are exported", {
   expect_true(is.function(electricity_price))
   expect_true(is.function(electricity_price_trend))
+  expect_true(is.function(expected_life_loss))
   expect_true(is.function(life_expectancy))
   expect_true(is.function(life_expectancy_trend))
 })
