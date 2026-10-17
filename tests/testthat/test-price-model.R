@@ -1,11 +1,7 @@
-test_that("triplet predictor regresses 1:1 against autoresearch predict_fn (dev-only anchor)", {
-  cand <- c("autoresearch/train.R", file.path("..", "..", "autoresearch", "train.R"))
-  path <- cand[file.exists(cand)][1L]
-  if (is.na(path)) path <- ""
-  skip_if(!nzchar(path), "autoresearch source tree not present (installed-package run)")
-  code <- paste(readLines(path), collapse = "\n")
-  tailpos <- regexpr("if [(]sys[.]nf", code)[1]
-  eval(parse(text = substring(code, 1, tailpos - 1)))  # defines predict_fn (agent source)
+test_that("triplet predictor regresses 1:1 against the frozen reference predict_fn", {
+  path <- test_path("fixtures", "predict_fn_reference.R")
+  skip_if(!file.exists(path), "reference predictor fixture missing")
+  eval(parse(text = readLines(path, warn = FALSE)), envir = environment())
   fit <- lifewatt:::.price_fit()
   cache <- lifewatt:::.monthly_cache()
   model <- list(params = fit$params, train = cache, hw = fit$hw)
