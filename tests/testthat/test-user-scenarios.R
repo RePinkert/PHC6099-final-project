@@ -108,3 +108,12 @@ test_that("scenario 9: 讲不通的输入会被指名拒绝（快照锁定用户
     tryCatch(electricity_price(anchor_zip_fl), error = function(e) e)$message
   )
 })
+
+test_that("scenario 10: my_electricity 与正门同引擎、能源侧无 LE 列", {
+  a <- my_electricity(anchor_zip_fl, bill = 180, time = "2026-12", usage = 1200)
+  b <- expected_life_loss(anchor_zip_fl, "2026-12", bill = 180, usage = 1200)
+  expect_equal(a$price_posterior, b$price_posterior)
+  expect_equal(a$evidence_regime, "posterior")
+  expect_false(any(grepl("^le_loss|e0_anchor", names(a))))
+  expect_provenance_cols(a)
+})
