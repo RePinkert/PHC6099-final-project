@@ -18,7 +18,15 @@ A data.frame with one row per measure: \code{zip}, \code{measure_id},
 \code{measure}, \code{category}, \code{value} (percent), \code{low_ci} and \code{high_ci} (95\%
 confidence limits), \code{unit}, \code{value_type}, \code{brfss_year},
 \code{total_population}, and the provenance columns \code{source}, \code{level},
-\code{degraded_from} and \code{mapping_vintage}.
+\code{degraded_from}, \code{mapping_vintage} and \code{provisional} (always \code{FALSE}: the
+PLACES 2025 release is a published cross-section, not a provisional
+vintage).
+
+The number of rows depends on the ZIP: PLACES publishes at most 35
+BRFSS-2023 measures per ZCTA and omits the measures suppressed for that
+ZCTA (ZIP 32601 has 28). A measure that exists nationally but is
+suppressed for the requested ZIP therefore fails with the same
+"not available" error as a misspelled measure ID.
 }
 \description{
 Returns model-based prevalence estimates of adult health measures (for

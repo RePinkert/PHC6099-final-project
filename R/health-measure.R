@@ -36,7 +36,15 @@
 #'   `measure`, `category`, `value` (percent), `low_ci` and `high_ci` (95%
 #'   confidence limits), `unit`, `value_type`, `brfss_year`,
 #'   `total_population`, and the provenance columns `source`, `level`,
-#'   `degraded_from` and `mapping_vintage`.
+#'   `degraded_from`, `mapping_vintage` and `provisional` (always `FALSE`: the
+#'   PLACES 2025 release is a published cross-section, not a provisional
+#'   vintage).
+#'
+#'   The number of rows depends on the ZIP: PLACES publishes at most 35
+#'   BRFSS-2023 measures per ZCTA and omits the measures suppressed for that
+#'   ZCTA (ZIP 32601 has 28). A measure that exists nationally but is
+#'   suppressed for the requested ZIP therefore fails with the same
+#'   "not available" error as a misspelled measure ID.
 #' @export
 #'
 #' @examples
@@ -81,6 +89,7 @@ health_measure <- function(zip, measure = NULL) {
     level = "zcta",
     degraded_from = "zip",
     mapping_vintage = "2020 ZCTA",
+    provisional = FALSE,
     stringsAsFactors = FALSE,
     row.names = NULL
   )
