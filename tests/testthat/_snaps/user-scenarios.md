@@ -52,3 +52,26 @@
     Output
       [1] "Provide either year (2023-2025 annual ZIP-level) or period = \"mom\" (state monthly series)."
 
+# scenario 11: 健康侧查糖尿病与高血压（ZCTA 原生，带 95% CI）
+
+    Code
+      print(r[, c("zip", "measure_id", "measure", "value", "low_ci", "high_ci")])
+    Output
+          zip measure_id             measure value low_ci high_ci
+      1 32601     BPHIGH High Blood Pressure  24.0   21.4    26.9
+      2 32601   DIABETES            Diabetes   7.7    6.8     8.7
+
+# scenario 13: 抑制项与拼错 ID 报同一个错，坏 ZIP 各自指名
+
+    Code
+      tryCatch(health_measure("abcde"), error = function(e) e)$message
+    Output
+      [1] "Invalid zip: abcde (expects a 5-digit or ZIP+4 code)."
+
+---
+
+    Code
+      tryCatch(health_measure("99999"), error = function(e) e)$message
+    Output
+      [1] "No CDC PLACES estimates for ZIP 99999 (it may not be a ZCTA, or its population is too small)."
+
