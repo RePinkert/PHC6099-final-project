@@ -26,17 +26,22 @@ electricity_price("32601", year = 2024)
 
 # state monthly series (B1 cache, 2023-01 .. 2026-07; 2025+ flagged provisional)
 electricity_price("32601", period = "mom")
+
+# trend views
+electricity_price_trend("32601", period = "yoy")
+electricity_price_trend("32601", period = "mom")
 ```
 
 Every row carries provenance columns (`source`, `level`, `degraded_from`,
 `mapping_vintage`, `provisional`). Prices are state-level estimates for the
 utility territory of the ZIP (OpenEI 2024 mapping); months from 2025-01 onward
-are provisional and flagged.
+are provisional and flagged. Both price functions sit on the same layers, so a
+trend and a level can never disagree.
 
 The bill-evidence view (`my_electricity`), the expected life-expectancy loss
 view (`expected_life_loss`) and the synthetic life-expectancy estimate
 (`life_expectancy`, `life_expectancy_trend`) land in later slices of this
-distribution; `electricity_price_trend` lands in the next one.
+distribution.
 
 ## Scope notes
 
