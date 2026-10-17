@@ -4,8 +4,8 @@
 #   .triplet_predict() must regress 1:1 against this function -- same point
 #   estimate, same .sd -- within 1e-10, on the six-state / four-horizon probe.
 #
-# Provenance: extracted verbatim from autoresearch/train.R version 15
-# (= exp#24 triple-mean: mean{lag12 + 12-month drift, v0 + b*h,
+# Provenance: extracted verbatim from the phase-B research harness (`train.R`,
+# version 15 = exp#24 triple-mean: mean{lag12 + 12-month drift, v0 + b*h,
 # HoltWinters(additive seasonal)}; interval = drift-origin simulation,
 # horizon-binned, pooled across states, q85 with the n < 40 fallback).
 # The research tree is not part of this repository; this frozen copy is the
