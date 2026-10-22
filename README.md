@@ -69,7 +69,9 @@ Every row carries provenance columns (`source`, `level`, `degraded_from`,
 `sensitivity_assumption` column. Prices are state-level estimates for the
 utility territory of the ZIP (OpenEI 2024 mapping); months from 2025-01 onward
 are provisional and flagged. Months after 2026-07 are served by the phase-B
-triplet forecast (`fit_as_of = 2026-07`).
+triplet forecast (`fit_as_of = 2026-07`), through 2026-12 — times beyond the
+declared window are refused. ZIP inputs must be 5 digits (leading zeros
+required) or ZIP+4; ambiguous shapes are rejected, never silently rewritten.
 
 ## Life expectancy: a synthetic estimate
 
