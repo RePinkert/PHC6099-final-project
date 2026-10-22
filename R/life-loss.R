@@ -1,5 +1,5 @@
 # expected_life_loss() —— UX 契约正门（exp#34 MVP）
-# 2026-10-16 mock 意向：time 给出对应时点的预估电费（实测 B1 <= 2026-07 / phaseB 三体预测 > 2026-07），
+# 2026-10-16 mock 意向：time 给出对应时点的预估电费（实测 B1 <= 2026-07 / LSTM 预测 > 2026-07），
 # bill 是贝叶斯证据，默认不填充。诚实契约（HANDOVER 2026-11-18 隔离记录）：
 #   delta_le 在弹性来源核实之前只能以调用方显式敏感度参数存在（输出带 sensitivity_assumption 列）；
 #   EIA-112 (C1) 机制列 exp#39 已接线（State Total 口径 per-1k；覆盖 2024，窗口外 NA + 注记）。
@@ -73,7 +73,7 @@
 #' Expected life expectancy loss for a ZIP code at a month
 #'
 #' Returns the electricity-price estimate at a time point (observed B1 state price for
-#' months up to 2026-07, phaseB triplet forecast afterwards), combined with the user
+#' months up to 2026-07, LSTM forecast afterwards), combined with the user
 #' bill as Bayesian evidence and (optionally) a life-expectancy loss estimate.
 #' Without `delta_le` the loss columns are withheld: no sourced US ZIP-level
 #' price-to-life-expectancy elasticity exists yet (HANDOVER quarantine contract,

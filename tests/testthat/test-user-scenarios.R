@@ -17,7 +17,7 @@ test_that("scenario 1: 查现在的电价（observed，账单未填）", {
 
 test_that("scenario 2: 查下个月的电价（predicted regime）", {
   r <- expected_life_loss(anchor_zip_fl, "2026-12")
-  prior <- .triplet_predict("FL", "2026-12")
+  prior <- .lstm_predict("FL", "2026-12")
   expect_equal(r$regime, "predicted")
   expect_equal(r$price, prior$price)
   expect_equal(r$price_sd, prior$.sd)
@@ -36,7 +36,7 @@ test_that("scenario 3: 只有账单 → 描述性证据（隐含用量，不造�
 
 test_that("scenario 4: 账单+用量 → 贝叶斯后验收紧（inverse-variance）", {
   r <- expected_life_loss(anchor_zip_fl, "2026-12", bill = 180, usage = 1200)
-  prior <- .triplet_predict("FL", "2026-12")
+  prior <- .lstm_predict("FL", "2026-12")
   p_meas <- 180 * 100 / 1200
   w_m <- 1 / 1^2
   w_p <- 1 / prior$.sd^2

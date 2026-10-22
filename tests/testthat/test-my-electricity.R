@@ -5,7 +5,7 @@ test_that("my_electricity mirrors the shared machinery (bill descriptive)", {
   expect_equal(r$evidence_regime, "descriptive")
   expect_equal(r$implied_usage_kwh, 180 * 100 / r$price)
   expect_true(is.na(r$price_posterior))
-  expect_true(grepl("phaseB triplet", r$notes))
+  expect_true(grepl("LSTM price model", r$notes))
   expect_true(is.na(r$provisional))
 })
 

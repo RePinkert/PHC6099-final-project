@@ -4,7 +4,7 @@
 #' Estimated electricity situation for a ZIP code at a month
 #'
 #' Energy-side view of the [expected_life_loss()] machinery: the price estimate at
-#' `time` (observed B1 state price up to 2026-07, phaseB triplet forecast afterwards),
+#' `time` (observed B1 state price up to 2026-07, LSTM forecast afterwards),
 #' with `bill` treated as Bayesian evidence (descriptive by itself; posterior when
 #' `usage` is also supplied).
 #'
@@ -37,7 +37,7 @@ my_electricity <- function(zipcode, bill = NULL, time, usage = NULL, meas_sd = 1
     if (nzchar(ev$note)) ev$note else character(0),
     .c1_note(base$state, base$period),
     if (identical(base$regime, "predicted"))
-      "future months served by the phaseB triplet model (fit_as_of = 2026-07)"
+      "future months served by the LSTM price model (fit_as_of = 2026-07)"
   )
   out <- base
   out$bill <- if (is.null(bill)) NA_real_ else bill

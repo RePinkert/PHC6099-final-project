@@ -35,7 +35,7 @@
   }
   zs <- .zip_state(zip)
   if (period > cutoff) {
-    pr <- .triplet_predict(zs$state, period)
+    pr <- .lstm_predict(zs$state, period)
     return(data.frame(
       zip = .zip5(zip),
       state = zs$state,
@@ -48,7 +48,7 @@
       regime = "predicted",
       provisional = NA,
       fit_as_of = cutoff,
-      source = "phaseB triplet forecast (HoltWinters additive + drift ensemble + lag12 drift; q85 horizon-binned pooled interval)",
+      source = "LSTM price forecast (multi-horizon h=1..5; relative-residual horizon intervals, calibration window 2026-02..2026-07)",
       level = "state",
       degraded_from = "zip",
       mapping_vintage = "2024",

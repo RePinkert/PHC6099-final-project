@@ -22,7 +22,7 @@ test_that("predicted regime, bill only: descriptive implied usage, no posterior"
 test_that("predicted regime, bill+usage: posterior equals inverse-variance blend", {
   r <- expected_life_loss("32601", "2026-12", bill = 180, usage = 1200, meas_sd = 1)
   expect_equal(r$evidence_regime, "posterior")
-  prior <- lifewatt:::.triplet_predict("FL", "2026-12")
+  prior <- lifewatt:::.lstm_predict("FL", "2026-12")
   p_meas <- 180 * 100 / 1200
   w_m <- 1 / 1^2
   w_p <- 1 / unname(prior$.sd)^2
