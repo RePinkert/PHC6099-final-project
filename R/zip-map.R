@@ -17,7 +17,7 @@
 })
 
 .zip5 <- function(zip) {
-  if (is.null(zip) || length(zip) != 1L) {
+  if (is.null(zip) || is.list(zip) || length(zip) != 1L) {
     stop("Invalid zip: expects exactly one value (5-digit ZIP or ZIP+4).", call. = FALSE)
   }
   if (is.na(zip)) {

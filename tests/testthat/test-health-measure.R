@@ -38,6 +38,32 @@ test_that("unknown or excluded measures fail loudly", {
   expect_error(health_measure("32601", measure = "SLEEP"), "not available", fixed = TRUE)
 })
 
+test_that("schema drift fails loudly instead of blaming the ZIP", {
+  local_mocked_bindings(.places_fetch = function(zip5) data.frame(foo = "bar"))
+  expect_error(health_measure("32601"), "schema unexpected", fixed = TRUE)
+})
+
+test_that("age-adjusted rows are dropped (crude-only contract)", {
+  local_mocked_bindings(.places_fetch = function(zip5) {
+    d <- read_places_fixture(zip5)
+    adj <- d[1:3, ]
+    adj$data_value_type <- "Age-adjusted prevalence"
+    rbind(d, adj)
+  })
+  r <- health_measure("32601")
+  expect_true(all(r$value_type == "Crude prevalence"))
+  expect_equal(anyDuplicated(r$measure_id), 0L)
+  expect_equal(nrow(r), 28L)
+})
+
+test_that("other-vintage-only responses are distinguished from no-coverage", {
+  local_mocked_bindings(.places_fetch = function(zip5) {
+    d <- read_places_fixture(zip5)
+    d[d$year == "2022", , drop = FALSE]
+  })
+  expect_error(health_measure("32601"), "other vintages", fixed = TRUE)
+})
+
 test_that("ZIPs without PLACES data and malformed ZIPs fail loudly", {
   local_mocked_bindings(.places_fetch = function(zip5) fake_fetch(zip5)[0, ])
   expect_error(health_measure("32601"), "No CDC PLACES estimates", fixed = TRUE)

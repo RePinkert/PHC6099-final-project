@@ -29,5 +29,5 @@ read_places_fixture <- function(zip5) {
 }
 
 # provenance 列契约：每个含数据值的输出行必须携带这四列（HANDOVER 阶段 C 准入标准）
-provenance_required <- c("source", "level", "degraded_from", "mapping_vintage")
+provenance_required <- c("source", "level", "degraded_from", "mapping_vintage", "provisional")
 expect_provenance_cols <- function(df) testthat::expect_contains(names(df), provenance_required)

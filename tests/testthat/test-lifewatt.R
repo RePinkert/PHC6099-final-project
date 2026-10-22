@@ -5,6 +5,7 @@ test_that("public functions are exported", {
   expect_true(is.function(my_electricity))
   expect_true(is.function(life_expectancy))
   expect_true(is.function(life_expectancy_trend))
+  expect_true(is.function(health_measure))
 })
 
 test_that("electricity_price dispatches to the internal layers", {
@@ -26,7 +27,7 @@ test_that("electricity_price honest errors", {
 test_that("life_expectancy: synthetic e0 with provenance + declared assumptions (exp#43)", {
   r <- life_expectancy("32601", quarter = "2024Q4")
   expect_equal(r$state, "FL")
-  expect_equal(r$e0_synth, lifewatt:::.le_synth("FL", "2024Q4", "12m")$e0_synth, tolerance = 1e-9)
+  expect_equal(r$e0_synth, r$e0_anchor + r$delta_e1, tolerance = 1e-9)
   expect_equal(r$e0_anchor, 79.0)
   expect_match(r$estimate_type, "synthetic_e0", fixed = TRUE)
   expect_match(r$estimate_type, "not an NCHS-published subnational life expectancy", fixed = TRUE)
@@ -60,11 +61,26 @@ test_that("trend wrappers: yoy uses A1 diffs, mom uses B1 diffs", {
   p23 <- lifewatt:::.zip_annual_price("32601", 2023)$price
   p24 <- lifewatt:::.zip_annual_price("32601", 2024)$price
   expect_equal(ty$change[1], p24 - p23, tolerance = 1e-9)
+  expect_true("provisional" %in% names(ty))
+  expect_false(any(ty$provisional))  # A1 年度两侧均为终值
+  expect_provenance_cols(ty)
   tm <- electricity_price_trend("32601", period = "mom")
   expect_equal(nrow(tm), 42L)
   b <- lifewatt:::.mom_series("32601")$price
   expect_equal(tm$change[1], b[2] - b[1], tolerance = 1e-9)
   expect_false(tm$provisional[1])
   expect_true(tm$provisional[nrow(tm)])
+  expect_provenance_cols(tm)
   expect_error(electricity_price_trend("32601", period = "q"))
+})
+
+test_that("every exported output carries the full provenance contract", {
+  expect_provenance_cols(electricity_price("32601", year = 2024))
+  expect_provenance_cols(electricity_price("32601", period = "mom"))
+  expect_provenance_cols(electricity_price_trend("32601", period = "yoy"))
+  expect_provenance_cols(electricity_price_trend("32601", period = "mom"))
+  expect_provenance_cols(expected_life_loss("32601", "2026-07"))
+  expect_provenance_cols(my_electricity("32601", time = "2026-07"))
+  expect_provenance_cols(life_expectancy("32601", quarter = "2024Q4"))
+  expect_provenance_cols(life_expectancy_trend("32601", period = "qoq", quarter = "2024Q4"))
 })

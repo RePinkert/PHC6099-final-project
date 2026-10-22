@@ -14,3 +14,18 @@ test_that("extdata layer ships phaseB fit with passing gate", {
   expect_setequal(unique(fit$states), c(state.abb, "DC"))
   expect_true(fit$consistency_tail_ratio <= 1.5)
 })
+
+test_that("all data planes agree on the 51-state universe (no silent divergence)", {
+  cache <- lifewatt:::.monthly_cache()
+  fit <- lifewatt:::.price_fit()
+  map <- lifewatt:::.open_map()
+  vsrr <- utils::read.csv(system.file("extdata", "vsrr_state_quarter_slim.csv.gz", package = "lifewatt"),
+                          colClasses = c(state = "character"))
+  states <- unique(cache$state)
+  expect_setequal(fit$states, states)
+  expect_true(all(unique(map$state) %in% states))
+  expect_true(all(states %in% unique(vsrr$state)))
+  c1 <- utils::read.csv(system.file("extdata", "eia112_state_month_slim.csv.gz", package = "lifewatt"),
+                        colClasses = c(state = "character"))
+  expect_setequal(unique(c1$state), states)
+})

@@ -1,6 +1,7 @@
 test_that("triplet predictor regresses 1:1 against the frozen reference predict_fn", {
   path <- test_path("fixtures", "predict_fn_reference.R")
-  skip_if(!file.exists(path), "reference predictor fixture missing")
+  expect_true(file.exists(path),
+              info = "frozen predict_fn fixture must ship with the suite; its absence must fail loudly")
   eval(parse(text = readLines(path, warn = FALSE)), envir = environment())
   fit <- lifewatt:::.price_fit()
   cache <- lifewatt:::.monthly_cache()
