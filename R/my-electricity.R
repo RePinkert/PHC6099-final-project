@@ -29,14 +29,15 @@
 #' }
 my_electricity <- function(zipcode, bill = NULL, time, usage = NULL, meas_sd = 1) {
   base <- .price_at(zipcode, time)
-  if (!is.finite(meas_sd) || meas_sd <= 0) {
+  if (!is.numeric(meas_sd) || length(meas_sd) != 1L || !is.finite(meas_sd) || meas_sd <= 0) {
     stop("meas_sd must be a positive number (declared measurement sd, cents/kWh).", call. = FALSE)
   }
   ev <- .bill_evidence(base$price, base$price_sd, bill, usage, meas_sd)
   notes <- c(
     if (nzchar(ev$note)) ev$note else character(0),
     .c1_note(base$state, base$period),
-    "future months served by the phaseB triplet model (fit_as_of = 2026-07)"
+    if (identical(base$regime, "predicted"))
+      "future months served by the phaseB triplet model (fit_as_of = 2026-07)"
   )
   out <- base
   out$bill <- if (is.null(bill)) NA_real_ else bill

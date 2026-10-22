@@ -90,7 +90,8 @@ test_that("scenario 8: 多 utility zip、ZIP+4、跨年锚点回退", {
   expect_equal(r$le_loss_pct_of_anchor, 0.02 / anchor_e0_2024 * 100)
   r4 <- expected_life_loss(paste0(anchor_zip_fl, "-4401"), "2026-07")
   expect_equal(r4$zip, anchor_zip_fl)
-  expect_equal(lifewatt:::.zip5("1002"), "01002")   # 新荷兰传统 4 位写法
+  expect_equal(lifewatt:::.zip5("01002"), "01002")
+  expect_error(lifewatt:::.zip5("1002"), "leading zeros required", fixed = TRUE)  # 4 位写法拒绝，防呆
 })
 
 test_that("scenario 9: 讲不通的输入会被指名拒绝（快照锁定用户可见报错文本）", {
@@ -169,9 +170,9 @@ test_that("scenario 13: 抑制项与拼错 ID 报同一个错，坏 ZIP 各自�
   expect_error(health_measure(anchor_zip_fl, measure = "SLEEP"), "not available", fixed = TRUE)
   # 大写化后再校验，用户写 "diabetes" 不该报错
   expect_equal(health_measure(anchor_zip_fl, measure = "diabetes")$measure_id, "DIABETES")
-  # ZIP 归一化边界：ZIP+4 与 4 位写法
+  # ZIP 归一化边界：ZIP+4 与前导零 5 位
   expect_equal(health_measure(paste0(anchor_zip_fl, "-4401"))$zip[1], anchor_zip_fl)
-  expect_equal(health_measure("1002")$zip[1], "01002")
+  expect_equal(health_measure("01002")$zip[1], "01002")
   # 用户可见报错文本快照
   expect_snapshot(tryCatch(health_measure("abcde"), error = function(e) e)$message)
   local_mocked_bindings(.places_fetch = function(zip5) read_places_fixture(zip5)[0, ])

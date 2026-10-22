@@ -66,7 +66,7 @@
     Code
       tryCatch(health_measure("abcde"), error = function(e) e)$message
     Output
-      [1] "Invalid zip: abcde (expects a 5-digit or ZIP+4 code)."
+      [1] "Invalid zip 'abcde': expected 5 digits (leading zeros required, e.g. '01002') or ZIP+4."
 
 ---
 

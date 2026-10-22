@@ -85,7 +85,8 @@
   yr <- as.integer(substr(quarter, 1L, 4L))
   anchor <- .anchor_for(yr)
   anchor_note <- if (anchor$year != yr) sprintf(
-    "quarter year %d outside D2 anchor table; fell back to %d (latest available)", yr, anchor$year) else ""
+    "quarter year %d outside D2 anchor table; fell back to %d (%s available)", yr, anchor$year,
+    if (anchor$year > yr) "earliest" else "latest") else ""
   d <- .table_derivs(tab_st)
   dnat <- .table_derivs(tab_nat)
   data.frame(

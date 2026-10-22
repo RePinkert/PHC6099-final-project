@@ -8,8 +8,8 @@
 \description{
 \code{lifewatt} turns a US ZIP code into environmental justice indicators:
 average residential electricity price and its year-over-year (YoY) and
-month-over-month (MoM) trends, plus average life expectancy and its YoY and
-MoM trends.
+month-over-month (MoM) trends, plus a synthetic life expectancy and its
+year-over-year and quarter-over-quarter trends.
 }
 \author{
 \strong{Maintainer}: Your Name \email{you@example.com}

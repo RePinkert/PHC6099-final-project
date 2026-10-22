@@ -3,7 +3,8 @@
 # Only BRFSS 2023 measures are returned (candidate-list E1: the 5 BRFSS 2022 measures are excluded).
 
 .places_url <- function(zip5) {
-  sprintf("https://data.cdc.gov/resource/qnzd-25i4.csv?locationname=%s&$limit=200", zip5)
+  sprintf("https://data.cdc.gov/resource/qnzd-25i4.csv?locationname=%s&$limit=200",
+          utils::URLencode(zip5, reserved = TRUE))
 }
 
 .places_fetch <- function(zip5) {
@@ -55,11 +56,22 @@
 health_measure <- function(zip, measure = NULL) {
   z <- .zip5(zip)
   d <- .places_fetch(z)
-  d <- d[d$year == "2023", , drop = FALSE]
+  need <- c("year", "measureid", "data_value", "data_value_type",
+            "low_confidence_limit", "high_confidence_limit", "locationname")
+  if (!all(need %in% names(d))) {
+    stop("PLACES response schema unexpected (dataset qnzd-25i4 may have changed); refusing to guess.",
+         call. = FALSE)
+  }
   if (nrow(d) == 0L) {
     stop(sprintf(
       "No CDC PLACES estimates for ZIP %s (it may not be a ZCTA, or its population is too small).", z),
       call. = FALSE)
+  }
+  d <- d[d$data_value_type == "Crude prevalence", , drop = FALSE]
+  d <- d[d$year == "2023", , drop = FALSE]
+  if (nrow(d) == 0L) {
+    stop(sprintf("No crude BRFSS-2023 PLACES estimates for ZIP %s (published rows are other vintages or value types).", z),
+         call. = FALSE)
   }
   if (!is.null(measure)) {
     measure <- toupper(as.character(measure))

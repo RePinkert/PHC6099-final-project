@@ -29,6 +29,10 @@
 
 ## bill 证据合成（exp#34 假设：bill+usage = 局部测量 -> 反方差合成后验；bill 单独 = 描述性证据）
 .bill_evidence <- function(price, price_sd, bill, usage, meas_sd = 1) {
+  if (!is.numeric(price) || length(price) != 1L || !is.finite(price) || price <= 0) {
+    stop("price must be a positive finite number (cents/kWh) before evidence can be combined.",
+         call. = FALSE)
+  }
   has_bill <- !is.null(bill)
   has_usage <- !is.null(usage)
   if (!has_bill && !has_usage) {
@@ -38,10 +42,10 @@
   if (has_usage && !has_bill) {
     stop("usage without bill is not evidence: rerun with bill (USD/month) supplied.", call. = FALSE)
   }
-  if (!is.finite(bill) || bill <= 0) {
+  if (!is.numeric(bill) || length(bill) != 1L || !is.finite(bill) || bill <= 0) {
     stop("bill must be a positive number (USD/month).", call. = FALSE)
   }
-  if (has_usage && (!is.finite(usage) || usage <= 0)) {
+  if (has_usage && (!is.numeric(usage) || length(usage) != 1L || !is.finite(usage) || usage <= 0)) {
     stop("usage must be a positive number (kWh/month).", call. = FALSE)
   }
   implied <- bill * 100 / price
@@ -104,19 +108,20 @@
 expected_life_loss <- function(zipcode, time, bill = NULL, usage = NULL,
                                delta_le = NULL, meas_sd = 1) {
   base <- .price_at(zipcode, time)
-  if (!is.finite(meas_sd) || meas_sd <= 0) {
+  if (!is.numeric(meas_sd) || length(meas_sd) != 1L || !is.finite(meas_sd) || meas_sd <= 0) {
     stop("meas_sd must be a positive number (declared measurement sd, cents/kWh).", call. = FALSE)
   }
   ev <- .bill_evidence(base$price, base$price_sd, bill, usage, meas_sd)
 
-  if (!is.null(delta_le) && !is.finite(delta_le)) {
+  if (!is.null(delta_le) && (!is.numeric(delta_le) || length(delta_le) != 1L || !is.finite(delta_le))) {
     stop("delta_le must be a finite number of years (caller-declared sensitivity parameter).",
          call. = FALSE)
   }
   yr <- as.integer(substr(base$period, 1L, 4L))
   anchor <- .anchor_for(yr)
   anchor_note <- if (anchor$year != yr) sprintf(
-    "time year %d outside anchor table; fell back to %d (latest available)", yr, anchor$year) else ""
+    "time year %d outside anchor table; fell back to %d (%s available)", yr, anchor$year,
+    if (anchor$year > yr) "earliest" else "latest") else ""
 
   if (is.null(delta_le)) {
     le_years <- NA_real_

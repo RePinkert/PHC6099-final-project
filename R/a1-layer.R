@@ -28,12 +28,12 @@
       s <- s[order(s$year), ]
       cch <<- structure(s$cus, names = paste(s$year, s$eiaid, s$state, sep = "|"))
     }
-    # 目标 utility 在该州的最新可得客户数；缺则 NA
+    # 目标 utility 在该州的最新可得客户数；缺名回落 NA 并继续尝试更早年份（不中断循环）
     yr <- .annual_years()
     hit <- NA_real_
     for (y in rev(yr)) {
-      v <- cch[[paste(y, eiaid, state, sep = "|")]]
-      if (!is.na(v)) {
+      v <- unname(cch[paste(y, eiaid, state, sep = "|")])
+      if (length(v) == 1L && !is.na(v)) {
         hit <- v
         break
       }

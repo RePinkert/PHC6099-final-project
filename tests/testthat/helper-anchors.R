@@ -4,7 +4,7 @@
 anchor_zip_fl <- "32601"
 anchor_zip_ak <- "99501"
 anchor_zip_multi <- "28657"
-anchor_zip_single <- "1002"
+anchor_zip_single <- "01002"
 
 anchor_price_fl_2026_07 <- 15.03
 anchor_price_ak_2023_01 <- 21.73

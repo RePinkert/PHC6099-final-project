@@ -1,5 +1,31 @@
 # lifewatt 0.0.0.9000
 
+* Breaking: ZIP inputs now follow a strict US ZIP contract instead of being
+  silently rewritten. After unambiguous preprocessing (numeric whole numbers,
+  ZIP+4, 9-digit strings, surrounding whitespace) the value must match
+  `^[0-9]{5}$`; the legacy New England 4-digit shorthand ("1002") is refused
+  with a hint to pass "01002", so a mistyped "3260" can no longer be routed to
+  an unrelated Maine ZIP.
+* Breaking: `expected_life_loss()` / `my_electricity()` refuse times after
+  2026-12, the declared window; the forecast regime covers 2026-08..2026-12
+  only (`fit_as_of = 2026-07`, intervals calibrated for horizons <= 13 months).
+* Fix: residential-customer weighting now falls back across data years as
+  documented (a utility missing the newest year's customer count keeps its
+  older-year weight instead of silently degrading to equal weighting).
+* Fix: `health_measure()` validates the PLACES response schema (a CDC dataset
+  change now fails loudly instead of being misreported as a bad ZIP), keeps
+  only `Crude prevalence` rows, and separates "not a ZCTA" from "other
+  vintages/value types only".
+* Fix: `electricity_price_trend(period = "yoy")` gains the `provisional`
+  column (always `FALSE`: both endpoints are EIA-861 final years), so every
+  output row now carries the full provenance contract.
+* Fix: anchor fallback notes state the correct direction ("earliest available"
+  when falling back to the table head); `my_electricity()` mentions the
+  forecast model only for predicted months; internal price/evidence inputs are
+  scalar-validated (bill/usage/meas_sd/delta_le) and refuse non-positive
+  prices.
+* The OpenEI ZIP mapping is vintage 2024 while EIA-861 carries 2025 final
+  prices; every row carries `mapping_vintage` so this lag stays visible.
 * Seven public functions replace the placeholder stubs, each released as its own
   commit on `develop`:
   - `electricity_price()` / `electricity_price_trend()`: the ZIP-level annual

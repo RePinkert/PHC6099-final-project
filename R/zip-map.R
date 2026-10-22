@@ -17,12 +17,26 @@
 })
 
 .zip5 <- function(zip) {
-  z <- gsub("[^0-9]", "", as.character(zip))
-  if (nchar(z) == 4L) z <- paste0("0", z)  # 新 England 传统 4 位写法 -> 01002
-  if (!(nchar(z) %in% c(5L, 9L))) {
-    stop(sprintf("Invalid zip: %s (expects a 5-digit or ZIP+4 code).", zip), call. = FALSE)
+  if (is.null(zip) || length(zip) != 1L) {
+    stop("Invalid zip: expects exactly one value (5-digit ZIP or ZIP+4).", call. = FALSE)
   }
-  substr(z, 1L, 5L)
+  if (is.na(zip)) {
+    stop("Invalid zip: NA is not a ZIP code.", call. = FALSE)
+  }
+  z <- if (is.numeric(zip)) {
+    if (!is.finite(zip) || zip != trunc(zip)) {
+      stop(sprintf("Invalid zip: %s (numeric zip must be a whole number).", format(zip)), call. = FALSE)
+    }
+    format(zip, scientific = FALSE, trim = TRUE)
+  } else {
+    trimws(as.character(zip))
+  }
+  if (grepl("^[0-9]{5}-[0-9]{4}$", z) || grepl("^[0-9]{9}$", z)) z <- substr(z, 1L, 5L)
+  if (!grepl("^[0-9]{5}$", z)) {
+    stop(sprintf("Invalid zip '%s': expected 5 digits (leading zeros required, e.g. '01002') or ZIP+4.", z),
+         call. = FALSE)
+  }
+  z
 }
 
 .zip_lookup <- function(zip) {

@@ -27,6 +27,12 @@
   fit <- .price_fit()
   period <- .month_key(time)
   cutoff <- fit$fit_as_of
+  if (period > "2026-12") {
+    stop(sprintf(paste0("time %s is outside the supported window (2023-01..2026-12); ",
+                        "the forecast regime stops at 2026-12 (fit_as_of = %s, intervals ",
+                        "calibrated for horizons <= 13 months)."), period, cutoff),
+         call. = FALSE)
+  }
   zs <- .zip_state(zip)
   if (period > cutoff) {
     pr <- .triplet_predict(zs$state, period)
@@ -56,6 +62,10 @@
   if (nrow(row) == 0L) {
     stop(sprintf("B1 cache has no record for state %s at %s (observed window 2023-01 -> %s).",
                  zs$state, period, cutoff), call. = FALSE)
+  }
+  if (!is.finite(row$price) || row$price <= 0) {
+    stop(sprintf("B1 cache price invalid for %s at %s; refusing to build evidence on it.",
+                 zs$state, period), call. = FALSE)
   }
   data.frame(
     zip = .zip5(zip),
