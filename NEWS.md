@@ -1,5 +1,14 @@
 # lifewatt 0.0.0.9000
 
+* The annual ZIP price of a multi-utility ZIP is now weighted by each utility's
+  2020 population share inside the ZIP (census blocks x HIFLD retail service
+  territories; overlapping territories resolved to the smallest one), replacing
+  system-wide residential customers. New columns `weight_basis` and
+  `share_overlap_frac`; ZIPs without a share fall back to customers and say so.
+  New shipped table `inst/extdata/zip_utility_share_slim.csv.gz`, assembled by
+  `data-raw/assemble_zip_utility_share.R`. 32601 moves from 13.72 to 14.87
+  cents/kWh (2024) and 32608 from 16.26 to 13.95.
+
 * Every value row now carries `confidence_tier` (A observed at the reported
   granularity / B observed but coarser than the ZIP / C modeled or synthetic).
 * State-level price rows (`electricity_price(period = "mom")`, and the price in

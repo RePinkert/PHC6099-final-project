@@ -19,11 +19,12 @@ test_that("annual multi-utility price reports the utility range, not just a poin
   r <- lifewatt:::.zip_annual_price(anchor_zip_fl, 2024)
   slim <- lifewatt:::.annual_slim()
   s <- slim[slim$year == 2024 & slim$state == "FL" & slim$eiaid %in% c("3757", "6909"), ]
-  expect_equal(r$price_min, min(s$price))
-  expect_equal(r$price_max, max(s$price))
+  sh <- lifewatt:::.zip_shares(anchor_zip_fl)
+  served <- s[s$eiaid %in% sh$eiaid[sh$pop_share > 0], ]
+  expect_equal(r$price_min, min(served$price))
+  expect_equal(r$price_max, max(served$price))
   expect_true(r$price_min <= r$price && r$price <= r$price_max)
-  expect_match(r$weight_scheme, "not the within-zip share", fixed = TRUE)
-  expect_match(r$confidence_tier, "^B:")
+  expect_match(r$weight_scheme, "population share inside the ZCTA", fixed = TRUE)
   single <- lifewatt:::.zip_annual_price(anchor_zip_single, 2024)
   expect_equal(single$price_min, single$price_max)
   expect_equal(single$price, single$price_min)
@@ -71,4 +72,35 @@ test_that("PLACES rows are tier C (model-based small-area estimates)", {
   local_mocked_bindings(.places_fetch = read_places_fixture)
   h <- health_measure(anchor_zip_fl, measure = "DIABETES")
   expect_match(h$confidence_tier, "^C:")
+})
+
+test_that("shipped population shares are well-formed", {
+  s <- lifewatt:::.zip_share_slim()
+  expect_true(all(s$pop_share >= 0 & s$pop_share <= 1))
+  expect_true(all(s$pop_share_equal >= 0 & s$pop_share_equal <= 1))
+  tot <- tapply(s$pop_share, s$zip, sum)
+  expect_true(all(abs(tot - 1) < 1e-4))
+  expect_true(all(s$assigned_frac > 0 & s$assigned_frac <= 1 + 1e-9))
+  expect_true(all(s$overlap_frac >= 0 & s$overlap_frac <= 1 + 1e-9))
+  # 只覆盖 OpenEI 中的多 utility ZIP
+  map <- unique(lifewatt:::.open_map()[c("zip", "eiaid")])
+  n_u <- table(map$zip)
+  expect_true(all(unique(s$zip) %in% names(n_u)[n_u > 1L]))
+})
+
+test_that("a ZIP without population shares falls back to system-wide customers, and says so", {
+  map <- unique(lifewatt:::.open_map()[c("zip", "eiaid")])
+  n_u <- table(map$zip)
+  multi <- names(n_u)[n_u > 1L]
+  no_share <- setdiff(multi, lifewatt:::.zip_share_slim()$zip)
+  expect_gt(length(no_share), 0L)
+  r <- NULL
+  for (z in no_share) {
+    r <- tryCatch(lifewatt:::.zip_annual_price(z, 2024), error = function(e) NULL)
+    if (!is.null(r) && r$n_priced > 1L) break
+  }
+  expect_equal(r$weight_basis, "customers")
+  expect_true(is.na(r$share_overlap_frac))
+  expect_match(r$weight_scheme, "not the within-zip share", fixed = TRUE)
+  expect_equal(r$level, "utility (customer-weighted to zip)")
 })

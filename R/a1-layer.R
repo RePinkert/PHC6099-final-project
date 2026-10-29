@@ -42,6 +42,29 @@
   }
 })
 
+## ZIP 内人口份额（data-raw/assemble_zip_utility_share.R：2020 block 人口 x HIFLD 供电区域）；
+## 只覆盖多 utility ZIP，且至少一个 block 分配上了区域；其余 ZIP 返回 NULL，调用方回退客户数加权
+.zip_share_slim <- local({
+  m <- NULL
+  function() {
+    if (is.null(m)) {
+      path <- system.file("extdata", "zip_utility_share_slim.csv.gz", package = "lifewatt")
+      if (!nzchar(path)) {
+        stop("ZIP population-share slim not shipped: inst/extdata/zip_utility_share_slim.csv.gz missing.",
+             call. = FALSE)
+      }
+      m <<- utils::read.csv(path, colClasses = c(zip = "character", eiaid = "character"))
+    }
+    m
+  }
+})
+
+.zip_shares <- function(zip5) {
+  s <- .zip_share_slim()
+  hit <- s[s$zip == zip5, ]
+  if (nrow(hit) == 0L) NULL else hit
+}
+
 .zip_annual_price <- function(zip, year) {
   year <- as.integer(year)
   if (length(year) != 1L || is.na(year)) stop("year expects exactly one integer year.", call. = FALSE)
@@ -57,37 +80,62 @@
              by = c("eiaid", "state"), all.x = TRUE, sort = FALSE)
   j$price[j$price <= 0] <- NA
   priced <- j[is.finite(j$price), ]
-  priced$weight <- ifelse(is.finite(priced$cus) & priced$cus > 0, priced$cus, NA)
-  n_equal_fallback <- sum(is.na(priced$weight))
-  priced$weight[is.na(priced$weight)] <- 1
   if (nrow(priced) == 0L) {
     stop(sprintf("No priced EIA-861 utility covers zip %s in %d (mapped utilities all lack annual price rows).",
                  .zip5(zip), year), call. = FALSE)
   }
+  # 首选：utility 在 ZIP 内覆盖的人口份额（在已定价 utility 间重新归一）；
+  # 份额缺失或已定价 utility 份额全为 0 时回退全州客户数（缺失再回退等权）
+  sh <- if (nrow(priced) > 1L) .zip_shares(.zip5(zip)) else NULL
+  pop_w <- if (is.null(sh)) NULL else {
+    w <- sh$pop_share[match(priced$eiaid, sh$eiaid)]
+    w[is.na(w)] <- 0
+    if (sum(w) > 0) w else NULL
+  }
+  n_equal_fallback <- 0L
+  if (!is.null(pop_w)) {
+    priced$weight <- pop_w / sum(pop_w)
+    basis <- "population_share"
+    scheme <- sprintf(paste0("2020 population share inside the ZCTA (census blocks x HIFLD service territories; ",
+                             "%.0f%% of ZCTA population assigned; %.0f%% of it in overlapping territories, ",
+                             "resolved to the smallest territory)"),
+                      100 * sh$assigned_frac[1], 100 * sh$overlap_frac[1])
+  } else {
+    priced$weight <- ifelse(is.finite(priced$cus) & priced$cus > 0, priced$cus, NA)
+    n_equal_fallback <- sum(is.na(priced$weight))
+    priced$weight[is.na(priced$weight)] <- 1
+    basis <- "customers"
+    scheme <- paste0("residential customers, utility system-wide in state -- not the within-zip share ",
+                     "(no population share for this zip; equal fallback where missing)")
+  }
+  # 区间只取实际有权重的 utility：人口份额为 0 的 utility 不服务该 ZIP 的人口
+  served <- priced[priced$weight > 0, ]
   miss <- zl$utility_name[!zl$eiaid %in% priced$eiaid]
   data.frame(
     zip = .zip5(zip),
     state = zl$state[1],
     year = year,
     price = stats::weighted.mean(priced$price, priced$weight),
-    price_min = min(priced$price),
-    price_max = max(priced$price),
+    price_min = min(served$price),
+    price_max = max(served$price),
     unit = "cents/kWh",
     regime = "observed",
     provisional = FALSE,
     n_mapped = nrow(zl),
     n_priced = nrow(priced),
-    weight_scheme = paste0("residential customers, utility system-wide in state -- not the within-zip share, ",
-                           "which no public source publishes (equal fallback where missing)"),
+    weight_basis = basis,
+    share_overlap_frac = if (is.null(pop_w)) NA_real_ else sh$overlap_frac[1],
+    weight_scheme = scheme,
     min_weight = min(priced$weight),
     max_weight = max(priced$weight),
     equal_fallbacks = n_equal_fallback + (nrow(zl) - nrow(priced)),
     missing_utilities = if (length(miss)) paste(miss, collapse = "; ") else NA_character_,
     source = "EIA-861 annual (Bundled/Part A, O-preferring; inst/extdata slim)",
-    level = "utility (customer-weighted to zip)",
+    level = if (basis == "population_share") "utility (population-share-weighted to zip)" else
+      "utility (customer-weighted to zip)",
     degraded_from = "zip",
     mapping_vintage = "2024",
-    confidence_tier = .confidence_tier(if (nrow(priced) == 1L) "A" else "B"),
+    confidence_tier = .confidence_tier(if (nrow(served) == 1L) "A" else "B"),
     stringsAsFactors = FALSE,
     row.names = NULL
   )
