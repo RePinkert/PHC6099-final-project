@@ -12,6 +12,8 @@
     stop(sprintf("B1 cache has no rows for state %s.", zs$state), call. = FALSE)
   }
   n <- nrow(rows)
+  spread <- vapply(as.integer(substr(rows$period, 1L, 4L)),
+                   function(y) .within_state_spread(zs$state, y)$sd, numeric(1))
   data.frame(
     zip = rep(.zip5(zip), n),
     state = rep(zs$state, n),
@@ -29,6 +31,8 @@
     degraded_from = rep("zip", n),
     mapping_vintage = rep("2024", n),
     weight_note = rep(zs$note, n),
+    within_state_sd = spread,
+    confidence_tier = rep(.confidence_tier("B"), n),
     stringsAsFactors = FALSE,
     row.names = NULL
   )
@@ -46,9 +50,11 @@
 #' @param zip A character or numeric US ZIP code.
 #' @param year A single integer year (2023-2025) for the ZIP-level annual estimate.
 #' @param period Pass `"mom"` for the state-level monthly series of the ZIP (43 rows).
-#' @return A data.frame with the price (cents/kWh) and provenance columns
-#'   (source/level/degraded_from/mapping_vintage/provisional); one row for the annual
-#'   regime, 43 rows for the monthly series.
+#' @return A data.frame with the price (cents/kWh), provenance columns
+#'   (source/level/degraded_from/mapping_vintage/provisional) and a `confidence_tier`
+#'   label; one row for the annual regime (with the mapped utilities' `price_min` /
+#'   `price_max`), 43 rows for the monthly series (with `within_state_sd`, the
+#'   customer-weighted spread of utility prices inside the state).
 #' @export
 #'
 #' @examples

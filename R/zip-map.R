@@ -75,8 +75,10 @@
     weight_scheme = scheme,
     state_share = as.numeric(wt[st]) / sum(wt),
     mapping_vintage = "2024",
+    # 权重只用于选州；A2 中多 utility zip 全部同州，所以它从不改变下游的州级数值
     note = if (nrow(hit) > 1L) {
-      sprintf("multi-utility zip; %s weighting", scheme)
+      sprintf(paste0("multi-utility zip; %s weighting selects the state only ",
+                     "(value is the state series, not a zip-weighted blend)"), scheme)
     } else {
       ""
     }

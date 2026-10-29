@@ -34,6 +34,7 @@
          call. = FALSE)
   }
   zs <- .zip_state(zip)
+  spread <- .within_state_spread(zs$state, as.integer(substr(period, 1L, 4L)))$sd
   if (period > cutoff) {
     pr <- .lstm_predict(zs$state, period)
     return(data.frame(
@@ -53,6 +54,8 @@
       degraded_from = "zip",
       mapping_vintage = "2024",
       weight_note = zs$note,
+      within_state_sd = spread,
+      confidence_tier = .confidence_tier("C"),
       stringsAsFactors = FALSE,
       row.names = NULL
     ))
@@ -84,6 +87,8 @@
     degraded_from = "zip",
     mapping_vintage = "2024",
     weight_note = zs$note,
+    within_state_sd = spread,
+    confidence_tier = .confidence_tier("B"),
     stringsAsFactors = FALSE,
     row.names = NULL
   )

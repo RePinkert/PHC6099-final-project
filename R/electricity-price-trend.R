@@ -38,6 +38,7 @@ electricity_price_trend <- function(zip, period = c("yoy", "mom")) {
         degraded_from = "zip",
         mapping_vintage = "2024",
         provisional = FALSE,
+        confidence_tier = .confidence_tier(if (ps[[i]]$n_priced == 1L && ps[[i - 1]]$n_priced == 1L) "A" else "B"),
         note = if (length(unique(vapply(ps, function(p) p$n_priced, integer(1)))) > 1L) {
           "priced-utility sets differ across years; per-year customer weighting keeps the blend honest but YoY comparability shifts"
         } else {
@@ -65,6 +66,7 @@ electricity_price_trend <- function(zip, period = c("yoy", "mom")) {
     level = "state",
     degraded_from = "zip",
     mapping_vintage = "2024",
+    confidence_tier = .confidence_tier("B"),
     stringsAsFactors = FALSE,
     row.names = NULL
   )
