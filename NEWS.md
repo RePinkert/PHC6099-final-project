@@ -1,5 +1,17 @@
 # lifewatt 0.0.0.9000
 
+* Every value row now carries `confidence_tier` (A observed at the reported
+  granularity / B observed but coarser than the ZIP / C modeled or synthetic).
+* State-level price rows (`electricity_price(period = "mom")`, and the price in
+  `my_electricity()` / `expected_life_loss()`) gain `within_state_sd`, the
+  customer-weighted spread of EIA-861 utility prices inside the state, so the
+  ZIP-to-state granularity loss is quantified instead of implied away.
+* The annual ZIP price gains `price_min` / `price_max` across the mapped
+  utilities, and `weight_scheme` now states that the weights are system-wide
+  customers, not within-ZIP shares.
+* Fix: the multi-utility `weight_note` no longer suggests the state value is a
+  ZIP-weighted blend; the weights only select the state.
+
 * Breaking: ZIP inputs now follow a strict US ZIP contract instead of being
   silently rewritten. After unambiguous preprocessing (numeric whole numbers,
   ZIP+4, 9-digit strings, surrounding whitespace) the value must match

@@ -102,6 +102,7 @@ health_measure <- function(zip, measure = NULL) {
     degraded_from = "zip",
     mapping_vintage = "2020 ZCTA",
     provisional = FALSE,
+    confidence_tier = .confidence_tier(rep("C", nrow(d))),
     stringsAsFactors = FALSE,
     row.names = NULL
   )

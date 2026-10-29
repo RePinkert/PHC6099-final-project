@@ -68,10 +68,38 @@ Every row carries provenance columns (`source`, `level`, `degraded_from`,
 `mapping_vintage`, `provisional`) and, where assumptions are declared, a
 `sensitivity_assumption` column. Prices are state-level estimates for the
 utility territory of the ZIP (OpenEI 2024 mapping); months from 2025-01 onward
-are provisional and flagged. Months after 2026-07 are served by the phase-B
-triplet forecast (`fit_as_of = 2026-07`), through 2026-12 — times beyond the
+are provisional and flagged. Months after 2026-07 are served by the LSTM
+price forecast (`fit_as_of = 2026-07`), through 2026-12 — times beyond the
 declared window are refused. ZIP inputs must be 5 digits (leading zeros
 required) or ZIP+4; ambiguous shapes are rejected, never silently rewritten.
+
+## Granularity and confidence
+
+Only one number in the package is measured at the ZIP's own utility: the annual
+price of a ZIP served by a single utility. Everything else is coarser or modeled,
+and each row says which through `confidence_tier`:
+
+| tier | meaning | where |
+|---|---|---|
+| A | observed at the reported granularity | annual price, single-utility ZIP |
+| B | observed, but coarser than the ZIP | monthly price (state); annual price of a multi-utility ZIP |
+| C | modeled or synthetic | forecast months, `life_expectancy()`, `health_measure()` |
+
+Two limits are worth stating plainly:
+
+- **Monthly and forecast prices are the state value.** Every ZIP in a state gets
+  the same number. The utility weights in the ZIP mapping only pick the state, and
+  in the OpenEI 2024 mapping no ZIP straddles a state line, so the weighting never
+  changes the price. `within_state_sd` (customer-weighted spread of EIA-861 utility
+  prices in the state) shows how far a ZIP's real price can typically sit from the
+  state value.
+- **Annual multi-utility prices are weighted by each utility's system-wide
+  customers, not by its share inside the ZIP**, which no public source publishes.
+  A large utility that touches the edge of a ZIP can dominate the blend (in 32608,
+  Duke Energy Florida carries about 87% of the weight). Read the point estimate
+  together with `price_min` / `price_max`, the range across the mapped utilities.
+  Intersecting utility service-territory polygons (HIFLD) with ZCTA population
+  would give real within-ZIP shares; that is open work.
 
 ## Life expectancy: a synthetic estimate
 

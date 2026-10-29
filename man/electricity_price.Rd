@@ -14,9 +14,11 @@ electricity_price(zip, year = NULL, period = NULL)
 \item{period}{Pass \code{"mom"} for the state-level monthly series of the ZIP (43 rows).}
 }
 \value{
-A data.frame with the price (cents/kWh) and provenance columns
-(source/level/degraded_from/mapping_vintage/provisional); one row for the annual
-regime, 43 rows for the monthly series.
+A data.frame with the price (cents/kWh), provenance columns
+(source/level/degraded_from/mapping_vintage/provisional) and a \code{confidence_tier}
+label; one row for the annual regime (with the mapped utilities' \code{price_min} /
+\code{price_max}), 43 rows for the monthly series (with \code{within_state_sd}, the
+customer-weighted spread of utility prices inside the state).
 }
 \description{
 Returns the residential electricity price estimate for the utility territory a US

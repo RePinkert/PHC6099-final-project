@@ -46,6 +46,7 @@ life_expectancy_trend <- function(zip, period = c("yoy", "qoq"), quarter = NULL)
     mapping_vintage = zs$mapping_vintage,
     provisional = TRUE,
     sensitivity_assumption = to_s$sensitivity_assumption,
+    confidence_tier = .confidence_tier("C"),
     notes = paste(c(
       "both endpoints provisional (VSRR vintage may be revised); quarter-over-period differs from monthly series elsewhere in the package",
       if (nzchar(from_s$notes)) from_s$notes else character(0),

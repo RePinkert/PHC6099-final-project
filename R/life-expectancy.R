@@ -70,6 +70,7 @@ life_expectancy <- function(zip, quarter = NULL) {
     mapping_vintage = zs$mapping_vintage,
     provisional = s$provisional,
     sensitivity_assumption = s$sensitivity_assumption,
+    confidence_tier = .confidence_tier("C"),
     notes = paste(c(if (nzchar(s$notes)) s$notes else character(0),
                     if (nzchar(zs$note)) zs$note else character(0)), collapse = " | "),
     stringsAsFactors = FALSE,
