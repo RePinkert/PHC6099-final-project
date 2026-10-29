@@ -41,9 +41,11 @@
 #' Average residential electricity price for a ZIP code
 #'
 #' Returns the residential electricity price estimate for the utility territory a US
-#' ZIP code belongs to. The annual ZIP-level estimate is a residential-customer-weighted
-#' blend of EIA-861 utility prices (final releases 2023-2025) over the utilities the
-#' OpenEI 2024 mapping assigns to the ZIP. The monthly series is the B1 state-level
+#' ZIP code belongs to. The annual ZIP-level estimate blends EIA-861 utility prices
+#' (final releases 2023-2025) over the utilities the OpenEI 2024 mapping assigns to the
+#' ZIP, weighted by each utility's 2020 population share inside the ZIP (census blocks
+#' x HIFLD service territories); ZIPs without a share fall back to system-wide
+#' residential customers, and `weight_basis` says which applied. The monthly series is the B1 state-level
 #' retail-sales cache (2023-01 to 2026-07); months from 2025-01 onward are provisional
 #' and flagged.
 #'

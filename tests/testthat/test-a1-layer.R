@@ -1,11 +1,14 @@
-test_that("A1 annual price: customer-weighted blend (anchor: 32601 @2024)", {
+test_that("A1 annual price: population-share blend (anchor: 32601 @2024)", {
   r <- lifewatt:::.zip_annual_price("32601", 2024)
   expect_equal(r$state, "FL")
   expect_equal(r$n_mapped, 2L)
   expect_equal(r$n_priced, 2L)
+  expect_equal(r$weight_basis, "population_share")
   slim <- lifewatt:::.annual_slim()
   s <- slim[slim$year == 2024 & slim$state == "FL" & slim$eiaid %in% c("3757", "6909"), ]
-  expect_equal(r$price, weighted.mean(s$price, s$cus), tolerance = 1e-9)
+  sh <- lifewatt:::.zip_shares("32601")
+  w <- sh$pop_share[match(s$eiaid, sh$eiaid)]
+  expect_equal(r$price, weighted.mean(s$price, w), tolerance = 1e-9)
   expect_equal(r$regime, "observed")
   expect_false(r$provisional)
   expect_equal(r$mapping_vintage, "2024")
@@ -70,12 +73,18 @@ test_that("regression: customers weights fall back across data years (year-fallb
 test_that("annual ZIP price equals an independent recompute from the shipped slim tables", {
   map <- lifewatt:::.open_map()
   slim <- lifewatt:::.annual_slim()
+  share <- utils::read.csv(system.file("extdata", "zip_utility_share_slim.csv.gz", package = "lifewatt"),
+                           colClasses = c(zip = "character", eiaid = "character"))
   recompute <- function(zip, year) {
     m <- unique(map[map$zip == zip, c("eiaid", "state")])
     s <- slim[slim$year == year & is.finite(slim$price) & slim$price > 0, ]
     j <- merge(m, s[, c("eiaid", "state", "price", "cus")], by = c("eiaid", "state"))
-    # 合约：定价权重 = 当年 residential customers（缺失回退等权 1）
-    w <- ifelse(is.finite(j$cus) & j$cus > 0, j$cus, 1)
+    # 合约：多 utility 时首选 ZIP 内人口份额（在已定价 utility 间归一），
+    # 无份额或份额全 0 时回退当年 residential customers（缺失回退等权 1）
+    sh <- share[share$zip == zip, ]
+    w <- if (nrow(j) > 1L && nrow(sh) > 0L) sh$pop_share[match(j$eiaid, sh$eiaid)] else NULL
+    if (!is.null(w)) w[is.na(w)] <- 0
+    if (is.null(w) || sum(w) == 0) w <- ifelse(is.finite(j$cus) & j$cus > 0, j$cus, 1)
     stats::weighted.mean(j$price, w)
   }
   for (z in c("32601", "28657", "99501", "01002")) {

@@ -75,14 +75,14 @@ required) or ZIP+4; ambiguous shapes are rejected, never silently rewritten.
 
 ## Granularity and confidence
 
-Only one number in the package is measured at the ZIP's own utility: the annual
-price of a ZIP served by a single utility. Everything else is coarser or modeled,
-and each row says which through `confidence_tier`:
+Only the annual price reaches the ZIP itself: one utility's price for a
+single-utility ZIP, or a population-share blend of several. Everything else is
+coarser or modeled, and each row says which through `confidence_tier`:
 
 | tier | meaning | where |
 |---|---|---|
 | A | observed at the reported granularity | annual price, single-utility ZIP |
-| B | observed, but coarser than the ZIP | monthly price (state); annual price of a multi-utility ZIP |
+| B | observed, but coarser than the ZIP or blended | monthly price (state); annual price of a multi-utility ZIP |
 | C | modeled or synthetic | forecast months, `life_expectancy()`, `health_measure()` |
 
 Two limits are worth stating plainly:
@@ -93,13 +93,22 @@ Two limits are worth stating plainly:
   changes the price. `within_state_sd` (customer-weighted spread of EIA-861 utility
   prices in the state) shows how far a ZIP's real price can typically sit from the
   state value.
-- **Annual multi-utility prices are weighted by each utility's system-wide
-  customers, not by its share inside the ZIP**, which no public source publishes.
-  A large utility that touches the edge of a ZIP can dominate the blend (in 32608,
-  Duke Energy Florida carries about 87% of the weight). Read the point estimate
-  together with `price_min` / `price_max`, the range across the mapped utilities.
-  Intersecting utility service-territory polygons (HIFLD) with ZCTA population
-  would give real within-ZIP shares; that is open work.
+- **Annual multi-utility prices are weighted by each utility's 2020 population
+  share inside the ZIP.** Every populated census block in the ZCTA is placed in
+  the HIFLD retail service territories that contain it (only utilities the OpenEI
+  mapping assigns to the ZIP count). The shares cover 14,661 of the 15,331
+  multi-utility ZIPs; the rest fall back to system-wide residential customers, and
+  `weight_basis` says which applied. Before this, a large utility touching the edge
+  of a ZIP could dominate: 32608 was 87% Duke Energy Florida and priced at 16.26
+  cents/kWh; it is now a Clay Electric / GRU split at 13.95.
+- **The shares depend on how overlapping territories are resolved.** HIFLD draws
+  many cooperatives and large investor-owned utilities as whole counties, so they
+  overlap the precisely drawn municipal territories. An overlapping block goes to
+  the smallest territory (the most specific boundary). Across ZIPs, a median 24%
+  of the population sits in overlaps, and 4,318 ZIPs are entirely in overlap;
+  `share_overlap_frac` reports this per ZIP, and the shipped table keeps an
+  equal-split alternative (`pop_share_equal`) for sensitivity checks. Read the
+  point estimate together with `price_min` / `price_max`.
 
 ## Life expectancy: a synthetic estimate
 

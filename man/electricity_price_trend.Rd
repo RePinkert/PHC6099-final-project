@@ -16,8 +16,9 @@ A data.frame with the change (cents/kWh) and provenance columns. Positive
 change = price increase; negative = decrease.
 }
 \description{
-Year-over-year change of the customer-weighted ZIP-level annual price (EIA-861,
-2024 and 2025 rows), or month-over-month change of the B1 state-level monthly series
+Year-over-year change of the ZIP-level annual price (EIA-861, 2024 and 2025 rows;
+utilities weighted by their population share inside the ZIP), or month-over-month
+change of the B1 state-level monthly series
 (42 rows; a flagged provisional change involves at least one provisional month).
 }
 \examples{

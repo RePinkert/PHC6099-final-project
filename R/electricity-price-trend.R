@@ -1,9 +1,10 @@
 # electricity_price_trend() —— 电价趋势视图（实装自 exp#37；与 electricity_price() 同层，趋势差异按口径分列）。
-# 年度同比 = A1 客户加权 ZIP 级年价差；月度环比 = B1 州级月频序列差（42 行）。
+# 年度同比 = A1 ZIP 级年价差（人口份额加权，缺份额回退客户数）；月度环比 = B1 州级月频序列差（42 行）。
 #' Change in average electricity price over time
 #'
-#' Year-over-year change of the customer-weighted ZIP-level annual price (EIA-861,
-#' 2024 and 2025 rows), or month-over-month change of the B1 state-level monthly series
+#' Year-over-year change of the ZIP-level annual price (EIA-861, 2024 and 2025 rows;
+#' utilities weighted by their population share inside the ZIP), or month-over-month
+#' change of the B1 state-level monthly series
 #' (42 rows; a flagged provisional change involves at least one provisional month).
 #'
 #' @param zip A character or numeric US ZIP code.
@@ -33,12 +34,13 @@ electricity_price_trend <- function(zip, period = c("yoy", "mom")) {
         pct_of_prior = (ps[[i]]$price - ps[[i - 1]]$price) / ps[[i - 1]]$price * 100,
         unit = "cents/kWh",
         n_priced = sprintf("%d(%d)/%d(%d)", ps[[i]]$n_priced, y, ps[[i - 1]]$n_priced, y - 1L),
-        source = "EIA-861 annual diff (Bundled/Part A, customer-weighted; inst/extdata slim)",
-        level = "utility (customer-weighted to zip)",
+        source = "EIA-861 annual diff (Bundled/Part A; inst/extdata slim)",
+        level = ps[[i]]$level,
         degraded_from = "zip",
         mapping_vintage = "2024",
         provisional = FALSE,
-        confidence_tier = .confidence_tier(if (ps[[i]]$n_priced == 1L && ps[[i - 1]]$n_priced == 1L) "A" else "B"),
+        confidence_tier = .confidence_tier(
+          if (startsWith(ps[[i]]$confidence_tier, "A") && startsWith(ps[[i - 1]]$confidence_tier, "A")) "A" else "B"),
         note = if (length(unique(vapply(ps, function(p) p$n_priced, integer(1)))) > 1L) {
           "priced-utility sets differ across years; per-year customer weighting keeps the blend honest but YoY comparability shifts"
         } else {
