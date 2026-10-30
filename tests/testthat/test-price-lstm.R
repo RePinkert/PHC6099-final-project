@@ -103,3 +103,33 @@ test_that(".sd is the Gaussian scale implied by the 85% absolute-residual quanti
   z <- iv$abs_q85[p$h] * p$price / p$.sd
   expect_equal(2 * pnorm(z) - 1, rep(0.85, 5), tolerance = 1e-12)
 })
+
+test_that("frozen calibration quantiles reproduce from the shipped weights and data", {
+  skip_on_cran()  # ~25 s: 459 forward passes (origins 2025-06..2026-02 x 51 states)
+  ns <- asNamespace("lifewatt")
+  fit <- ns$.price_lstm_fit()
+  ph <- ns$.price_history_wide()
+  months <- colnames(ph)
+  rel <- list()
+  for (o in months[match("2025-06", months):match("2026-02", months)]) {
+    j0 <- match(o, months)
+    for (s in rownames(ph)) {
+      w <- ns$.lstm_feature_window(s, o)
+      y <- ns$.lstm_denorm(ns$.lstm_forward_norm(array(w, c(1, dim(w))))[1, ], s)
+      for (h in seq_len(fit$h_max)) {
+        if (j0 + h <= length(months) && months[j0 + h] >= "2026-02") {
+          rel[[length(rel) + 1L]] <- c(h = h, r = (ph[s, j0 + h] - y[h]) / y[h])
+        }
+      }
+    }
+  }
+  rel <- as.data.frame(do.call(rbind, rel))
+  q <- function(x, p) unname(stats::quantile(x, p))
+  for (h in seq_len(fit$h_max)) {
+    r <- rel$r[rel$h == h]
+    expect_equal(length(r), fit$intervals$n[h])
+    expect_equal(q(r, 0.05), fit$intervals$r_q05[h], tolerance = 1e-6)
+    expect_equal(q(r, 0.95), fit$intervals$r_q95[h], tolerance = 1e-6)
+    expect_equal(q(abs(r), 0.85), fit$intervals$abs_q85[h], tolerance = 1e-6)
+  }
+})

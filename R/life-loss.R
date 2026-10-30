@@ -71,9 +71,11 @@
          implied_usage = implied,
          note = sprintf("inverse-variance blend, declared meas_sd=%.4f cents/kWh", meas_sd))
   } else {
-    list(regime = "measured_local", price_meas = p_meas, posterior = p_meas,
-         posterior_sd = meas_sd, implied_usage = implied,
-         note = "observed regime: local measurement reported alongside the measured state price")
+    # 实测月份没有先验 sd，无从合成：本地测量只放 price_meas，后验列留空，免得把用户自报值叫"后验"
+    list(regime = "measured_local", price_meas = p_meas, posterior = NULL,
+         posterior_sd = NULL, implied_usage = implied,
+         note = paste0("observed regime: no posterior (the measured state price has no prior sd); ",
+                       "the local measurement is in price_meas"))
   }
 }
 
