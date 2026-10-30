@@ -23,7 +23,8 @@
   slim <- .annual_slim()
   yrs <- .annual_years()
   y <- if (any(yrs <= year)) max(yrs[yrs <= year]) else min(yrs)
-  s <- slim[slim$year == y & slim$state == state &
+  # eiaid 99999 = EIA "Adjustment YYYY" 州级调整伪 utility（客户数可为负），不是真实 utility
+  s <- slim[slim$year == y & slim$state == state & slim$eiaid != "99999" &
               is.finite(slim$price) & slim$price > 0 &
               is.finite(slim$cus) & slim$cus > 0, ]
   if (nrow(s) < 2L) {

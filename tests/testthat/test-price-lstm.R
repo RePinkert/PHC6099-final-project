@@ -89,6 +89,17 @@ test_that("package prediction path carries no torch dependency", {
   p <- system.file("DESCRIPTION", package = "lifewatt")
   desc <- if (nzchar(p)) readLines(p) else readLines(test_path("..", "..", "DESCRIPTION"))
   expect_false(any(grepl("torch", desc)))
-  ns <- readLines(test_path("..", "..", "NAMESPACE"))
-  expect_false(any(grepl("torch", ns)))
+  # 安装态（R CMD check）没有 ../../NAMESPACE；用运行时已加载的导入表，两种模式都成立
+  expect_false("torch" %in% names(getNamespaceImports("lifewatt")))
+  lifewatt:::.lstm_predict("FL", "2026-12")
+  expect_false("torch" %in% loadedNamespaces())
+})
+
+test_that(".sd is the Gaussian scale implied by the 85% absolute-residual quantile", {
+  iv <- lifewatt:::.price_lstm_fit()$intervals
+  p <- lifewatt:::.lstm_predict(rep("FL", 5), sprintf("2026-%02d", 8:12))
+  # P(|e| <= abs_q85) = 0.85 under N(0, sd) => abs_q85 = sd * qnorm(0.925)
+  expect_equal(p$.sd, p$price * iv$abs_q85[p$h] / qnorm(0.925), tolerance = 1e-12)
+  z <- iv$abs_q85[p$h] * p$price / p$.sd
+  expect_equal(2 * pnorm(z) - 1, rep(0.85, 5), tolerance = 1e-12)
 })

@@ -67,3 +67,12 @@ test_that("honest errors", {
   expect_error(expected_life_loss("32601", "2026-07", delta_le = NA_real_), "finite", fixed = TRUE)
   expect_error(expected_life_loss("32601", "2026-07", meas_sd = 0), "meas_sd must be a positive number", fixed = TRUE)
 })
+
+test_that("implausible bill / usage combinations are refused, not turned into evidence", {
+  expect_error(expected_life_loss("32601", "2026-08", bill = 5000, usage = 1),
+               "outside the plausible 1..150 range", fixed = TRUE)
+  expect_error(my_electricity("32601", bill = 1, usage = 5000, time = "2026-08"),
+               "outside the plausible 1..150 range", fixed = TRUE)
+  r <- expected_life_loss("32601", "2026-08", bill = 180, usage = 1200)
+  expect_equal(r$price_meas, 15)
+})

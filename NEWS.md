@@ -1,5 +1,24 @@
 # lifewatt 0.0.0.9000
 
+* Fix: the forecast `price_sd` now uses `qnorm(0.925)`, the factor that turns the
+  85% absolute-residual quantile into a Gaussian sd. The old `qnorm(0.95)`
+  understated it by about 12.5%, which made bill posteriors too narrow. The
+  golden fixture and the scenario-2 snapshot move accordingly (32601 @ 2026-12:
+  1.054 -> 1.204); point forecasts and `q_lo` / `q_hi` are unchanged.
+* `expected_life_loss()` / `my_electricity()` refuse a bill / usage pair that
+  implies a price outside 1..150 cents/kWh instead of turning it into evidence
+  (bill = 5000, usage = 1 used to give a posterior of about 154,000 cents/kWh).
+* `within_state_sd` no longer counts EIA's "Adjustment" pseudo-utility
+  (eiaid 99999, sometimes with negative customers) as a utility. The LSTM's
+  annual covariate still includes those rows, as it did in training.
+* README gains "Price forecast: what the validation shows and what it does not":
+  the honest baseline comparison is the calibration window (about 15% better
+  than last value, not the early-stopping figures), training used annual
+  averages before their release (validation MSE 1.18 vs 1.34 when re-scored),
+  and the first forecast month jumps about 4% with no bias correction.
+* The no-torch test now passes under `R CMD check` (it read `../../NAMESPACE`,
+  which does not exist in an installed package).
+
 * The annual ZIP price of a multi-utility ZIP is now weighted by each utility's
   2020 population share inside the ZIP (census blocks x HIFLD retail service
   territories; overlapping territories resolved to the smallest one), replacing
