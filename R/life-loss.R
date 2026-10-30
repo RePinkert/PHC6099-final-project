@@ -55,6 +55,13 @@
                 note = "bill alone: implied usage only, no posterior (declared contract)"))
   }
   p_meas <- bill * 100 / usage
+  # 合理性：美国住宅电价（EIA-861 utility 年价）几乎全在 1..100 cents/kWh；
+  # 超出 [1, 150] 的局部测量多半是单位或位数错误，拒绝而不是把它当证据
+  if (p_meas < 1 || p_meas > 150) {
+    stop(sprintf(paste0("bill / usage implies %.1f cents/kWh, outside the plausible 1..150 range; ",
+                        "check units (bill in USD per month, usage in kWh per month)."), p_meas),
+         call. = FALSE)
+  }
   if (is.finite(price_sd)) {
     w_m <- 1 / meas_sd^2
     w_p <- 1 / price_sd^2

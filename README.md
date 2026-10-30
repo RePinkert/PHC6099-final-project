@@ -110,6 +110,34 @@ Two limits are worth stating plainly:
   equal-split alternative (`pop_share_equal`) for sensitivity checks. Read the
   point estimate together with `price_min` / `price_max`.
 
+## Price forecast: what the validation shows and what it does not
+
+Months 2026-08..2026-12 come from an LSTM whose fit ships in
+`inst/extdata/price_lstm_fit.rds` together with its baselines and coverage. Read
+those numbers with three caveats:
+
+- **Use the calibration window for the comparison.** The `mse_es` column comes
+  from the early-stopping window, which chose the model, so it flatters it (LSTM
+  0.93 vs last value 1.43). The calibration window (`mse_cal`, targets
+  2026-02..2026-07) played no part in fitting or model selection: LSTM 3.56,
+  last value 4.17, seasonal naive 5.02, about 15% better than the best baseline.
+  Likewise `coverage$transfer_early_window` is measured on the early-stopping
+  window and is not independent evidence.
+- **Training used each year's EIA-861 average from January of that year**,
+  months before it was published. Re-scoring the early-stopping window with only
+  the annual values available at the time raises the LSTM's MSE from 1.18 to 1.34
+  (the last-value baseline is 1.72), so validation overstates accuracy by about
+  14%. Live forecasts are not affected: the 2025 value they use is published.
+  A refit that stamps annual values at their release date is open work.
+- **The first forecast month jumps.** Across states, the median 2026-08 / 2026-07
+  ratio is 1.040, against a historical August/July median of 1.005, and the
+  calibration residuals have a positive median (+1.7% at h=1 to +4.4% at h=5).
+  The point forecast is not bias-corrected.
+
+`price_sd` is the Gaussian scale implied by the 85% absolute-residual quantile,
+`abs_q85 / qnorm(0.925)`. `q_lo` / `q_hi` are the 5% and 95% relative-residual
+quantiles; their coverage has not been checked separately.
+
 ## Life expectancy: a synthetic estimate
 
 `life_expectancy()` returns a **synthetic** estimate built from state mortality

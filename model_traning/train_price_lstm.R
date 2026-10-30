@@ -239,7 +239,7 @@ fc <- do.call(rbind, lapply(1:51, function(s) {
   data.frame(
     state = STATES[s], period = FC_MONTHS, h = 1:H,
     price = pr,
-    sd = pr * iv$abs_q85 / stats::qnorm(0.95),
+    sd = pr * iv$abs_q85 / stats::qnorm(0.925),
     q_lo = pr * (1 + iv$r_q05), q_hi = pr * (1 + iv$r_q95),
     stringsAsFactors = FALSE
   )
@@ -260,7 +260,7 @@ fit <- list(
     "seq_len=36, 51-state pooled; minmax per state + zscore fit on train window only); ",
     "interval = per-horizon quantiles of relative residuals (true-pred)/pred from the ",
     "held-out calibration window 2026-02..2026-07 (cross-state scale-standardised, no obs_max ",
-    "fallback); .sd = price*abs_q85/qnorm(0.95) keeps the downstream Gaussian-scale bridge; ",
+    "fallback); .sd = price*abs_q85/qnorm(0.925) keeps the downstream Gaussian-scale bridge; ",
     "early stopping on walk-forward valid 2025-07..2026-01, NOT on a test set"
   ),
   fit_as_of = "2026-07",
