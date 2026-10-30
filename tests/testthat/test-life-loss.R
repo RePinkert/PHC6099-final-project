@@ -35,7 +35,9 @@ test_that("predicted regime, bill+usage: posterior equals inverse-variance blend
 test_that("observed regime, bill+usage: local measurement alongside measured state price", {
   r <- expected_life_loss("32601", "2026-07", bill = 150, usage = 1000)
   expect_equal(r$evidence_regime, "measured_local")
-  expect_equal(r$price_posterior, 150 * 100 / 1000)
+  expect_equal(r$price_meas, 150 * 100 / 1000)
+  expect_true(is.na(r$price_posterior))  # nothing to blend with: no posterior is claimed
+  expect_true(is.na(r$price_posterior_sd))
   expect_true(is.na(r$price_sd))  # observed has no prior sd
 })
 

@@ -16,6 +16,15 @@
   than last value, not the early-stopping figures), training used annual
   averages before their release (validation MSE 1.18 vs 1.34 when re-scored),
   and the first forecast month jumps about 4% with no bias correction.
+* `model_traning/check_interval_coverage.R` replays the validation forecasts
+  from the shipped weights and reports interval coverage, including a
+  leave-one-month-out check: `q_lo` / `q_hi` (nominal 90%) cover 0.82-0.89, the
+  `price_sd` band (nominal 85%) 0.84-0.85. A `skip_on_cran()` test pins that the
+  frozen calibration quantiles reproduce from the shipped weights and data.
+* In the observed regime (months up to 2026-07), bill + usage no longer fills
+  `price_posterior` with the caller's own measurement. There is no prior sd to
+  blend with, so `price_posterior` / `price_posterior_sd` stay NA and the local
+  measurement is in `price_meas`.
 * The no-torch test now passes under `R CMD check` (it read `../../NAMESPACE`,
   which does not exist in an installed package).
 

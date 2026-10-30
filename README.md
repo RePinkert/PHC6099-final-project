@@ -136,7 +136,18 @@ those numbers with three caveats:
 
 `price_sd` is the Gaussian scale implied by the 85% absolute-residual quantile,
 `abs_q85 / qnorm(0.925)`. `q_lo` / `q_hi` are the 5% and 95% relative-residual
-quantiles; their coverage has not been checked separately.
+quantiles. `model_traning/check_interval_coverage.R` replays the validation
+forecasts from the shipped weights (it reproduces the frozen quantiles to 1e-7)
+and checks coverage by leaving out one calibration month at a time, the only
+check that does not reuse the residuals that set the quantiles:
+
+| interval | nominal | held-out coverage, h = 1..5 |
+|---|---|---|
+| `q_lo` / `q_hi` | 90% | 0.82, 0.88, 0.87, 0.89, 0.88 |
+| ±`qnorm(0.925)` × `price_sd` | 85% | 0.84, 0.85, 0.84, 0.85, 0.84 |
+
+So `q_lo` / `q_hi` run slightly narrow, worst at h = 1, which rests on only two
+calibration months.
 
 ## Life expectancy: a synthetic estimate
 
