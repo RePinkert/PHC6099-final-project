@@ -1,6 +1,6 @@
 # Internal price estimator `.price_at(zip, time)`（exp#32 实测分支，exp#33 补预测分支）
 # 口径：returns the state-level residential price at a month for the utility territory a zip belongs to.
-# B1 cache units = cents/kWh；provisional 若 period >= 2025-01（EIA 将回改，输出必须声明）。
+# B1 cache units = cents/kWh；provisional = EIA-861M 标 Preliminary（EIA 将回改，输出必须声明）。
 # 时间归一化：YYYY-MM 字符串、YYYY-M、"YYYY/MM"、Date；标量调用（mock 契约）。
 
 .month_key <- function(time) {
@@ -80,7 +80,7 @@
     unit = "cents/kWh",
     price_sd = NA_real_,
     regime = "observed",
-    provisional = period >= "2025-01",
+    provisional = row$data_status == "Preliminary",
     fit_as_of = NA_character_,
     source = "EIA retail-sales monthly (B1; inst/extdata cache)",
     level = "state",

@@ -5,7 +5,8 @@
   if (!nzchar(path)) {
     stop("B1 cache not shipped: inst/extdata/b1_monthly_cache.csv missing.", call. = FALSE)
   }
-  utils::read.csv(path, colClasses = c(state = "character", period = "character", price = "numeric"))
+  utils::read.csv(path, colClasses = c(state = "character", period = "character", price = "numeric",
+                                       data_status = "character"))
 }
 
 .price_fit <- function() {

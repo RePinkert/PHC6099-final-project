@@ -1,5 +1,16 @@
 # lifewatt 0.0.0.9000
 
+* The observed monthly price cache (`inst/extdata/b1_monthly_cache.csv`) is
+  rebuilt from EIA-861M's bulk file (`data-raw/assemble_eia861m_monthly.R`, no
+  API key needed) and picks up EIA's revisions: 625 of 2,193 state-months move,
+  4 by more than 1 cent/kWh (MD 2026-03 was an initial 35.85, now 22.2; CA
+  2025-04 33.82 -> 27.76). Values before 2025 are unchanged.
+* Breaking: `provisional` on observed months now follows EIA's own data status
+  (`Preliminary`, 2026-01 onward in this vintage) instead of a fixed 2025-01
+  cut-off; the cache gains a `data_status` column. 2025 months are now final.
+* The LSTM still reads `price_history_slim.csv.gz`, the vintage it was trained
+  on, so its inputs keep the old 2025-2026 values until the model is refit.
+
 * Fix: the forecast `price_sd` now uses `qnorm(0.925)`, the factor that turns the
   85% absolute-residual quantile into a Gaussian sd. The old `qnorm(0.95)`
   understated it by about 12.5%, which made bill posteriors too narrow. The
