@@ -34,7 +34,7 @@ library(lifewatt)
 # observed price (EIA-861 ZIP-level annual, customer-weighted)
 electricity_price("32601", year = 2024)
 
-# state monthly series (B1 cache, 2023-01 .. 2026-07; 2025+ flagged provisional)
+# state monthly series (B1 cache, 2023-01 .. 2026-07; EIA-preliminary months flagged provisional)
 electricity_price("32601", period = "mom")
 
 # trend views
@@ -67,8 +67,8 @@ health_measure("32601", measure = c("DIABETES", "BPHIGH"))
 Every row carries provenance columns (`source`, `level`, `degraded_from`,
 `mapping_vintage`, `provisional`) and, where assumptions are declared, a
 `sensitivity_assumption` column. Prices are state-level estimates for the
-utility territory of the ZIP (OpenEI 2024 mapping); months from 2025-01 onward
-are provisional and flagged. Months after 2026-07 are served by the LSTM
+utility territory of the ZIP (OpenEI 2024 mapping); months EIA still marks
+Preliminary (2026-01 onward in the shipped vintage) are flagged provisional. Months after 2026-07 are served by the LSTM
 price forecast (`fit_as_of = 2026-07`), through 2026-12 — times beyond the
 declared window are refused. ZIP inputs must be 5 digits (leading zeros
 required) or ZIP+4; ambiguous shapes are rejected, never silently rewritten.
@@ -133,6 +133,12 @@ those numbers with three caveats:
   ratio is 1.040, against a historical August/July median of 1.005, and the
   calibration residuals have a positive median (+1.7% at h=1 to +4.4% at h=5).
   The point forecast is not bias-corrected.
+
+- **The model's inputs are an older vintage than the observed series.** Observed
+  months come from the refreshed EIA-861M cache; the LSTM reads
+  `price_history_slim.csv.gz`, the vintage it was trained on, which still has
+  EIA's initial 2025-2026 values (MD 2026-03 at 35.85 rather than 22.2). A refit
+  on the current vintage is open work.
 
 `price_sd` is the Gaussian scale implied by the 85% absolute-residual quantile,
 `abs_q85 / qnorm(0.925)`. `q_lo` / `q_hi` are the 5% and 95% relative-residual
