@@ -1,5 +1,39 @@
 # lifewatt 0.0.0.9000
 
+* (Awaiting retrain.) Fix for the 2026-08 seam jump, prepared before the
+  retrain. `model_traning/diagnose_seam.R` showed the jump is not real: the true
+  Aug/Jul median is 0.9995 against 1.064 predicted, and in 2026-08 alone the LSTM
+  has an MSE of 3.36 vs 0.45 for the last value. It comes from two sparse
+  covariates that appear only at the end of the training history:
+  - The annual EIA-861 channel had data only for 2023-2025. With release dating
+    it first entered in 2024-10, so a training window held at most 4 such months,
+    against 22 at the 2026-07 origin.
+  - EIA-112 has only 2024. After 2024 it is carried forward, and its age reached
+    19 months at the 2026-07 origin; training never saw more than 1.
+
+  Changes:
+  - EIA-112 (c1) channels are removed from training. The annual channel is
+    backfilled to 2010 from the EIA-861 archives
+    (`data-raw/assemble_861_state_annual.R` ->
+    `inst/extdata/eia861_state_annual.csv.gz`; same definitions as the utility
+    slim, 2023-2025 identical). That leaves 8 channels.
+  - The serving path builds inputs from `fit$chan_names` and
+    `fit$transforms$ann_source`, so the shipped 11-channel fit is unchanged until
+    the retrain lands. `model_traning/check_feature_parity.R` checks that
+    training and serving build identical inputs (max difference 0).
+  - Architecture, seed, `fit_as_of` = 2026-07 and all three windows are
+    unchanged.
+
+  Acceptance criteria were fixed before the retrain and must not change after it
+  (`model_traning/accept_seam.R`):
+  - A1: the 2026-08 / 2026-07 median across states is in [0.99, 1.015].
+  - A2: at most 15% of states exceed their own 2015-2025 Aug/Jul maximum.
+  - A3: calibration-window MSE is below the last-value baseline.
+
+  The script also reports 2026-08 single-month MSE against last value and
+  seasonal ratio. It does not count toward the verdict, because 2026-08 was
+  already seen in the diagnosis.
+
 * The price LSTM is refit (same architecture: hidden 64, 36-month window,
   h = 1..5, 51 states pooled; `fit_as_of` still 2026-07):
   - Data: EIA-861M's state panel from 2010-01 in the current vintage

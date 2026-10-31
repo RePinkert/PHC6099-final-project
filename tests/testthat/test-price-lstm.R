@@ -136,3 +136,25 @@ test_that("frozen calibration quantiles reproduce from the shipped weights and d
     expect_equal(q(abs(r), 0.85), fit$intervals$abs_q85[h], tolerance = 1e-6)
   }
 })
+
+test_that("state annual EIA-861 table covers 2010..2025 and matches the utility slim on 2023..2025", {
+  n <- utils::read.csv(system.file("extdata", "eia861_state_annual.csv.gz", package = "lifewatt"),
+                       stringsAsFactors = FALSE)
+  expect_equal(sort(unique(n$year)), 2010:2025)
+  expect_equal(nrow(n), 51L * 16L)
+  expect_true(all(table(n$state, n$year) == 1))
+  a <- utils::read.csv(system.file("extdata", "eia861_annual_slim.csv.gz", package = "lifewatt"),
+                       stringsAsFactors = FALSE)
+  a <- a[a$eiaid != 99999 & is.finite(a$cus) & a$cus > 0, ]
+  g <- stats::aggregate(cbind(w = a$price * a$cus, c = a$cus), list(state = a$state, year = a$year), sum)
+  m <- merge(g, n, by = c("state", "year"))
+  expect_equal(nrow(m), 51L * 3L)
+  expect_equal(m$price, m$w / m$c, tolerance = 1e-10)
+})
+
+test_that("feature window is built from fit$chan_names (old 11-channel fit and refit share one builder)", {
+  fit <- lifewatt:::.price_lstm_fit()
+  w <- lifewatt:::.lstm_feature_window("FL", fit$fit_as_of)
+  expect_equal(dim(w), c(fit$seq_len, fit$n_chan))
+  expect_equal(length(fit$chan_names), fit$n_chan)
+})
