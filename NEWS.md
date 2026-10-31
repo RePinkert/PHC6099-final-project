@@ -1,7 +1,60 @@
 # lifewatt 0.0.0.9000
 
-* (Awaiting retrain: second attempt.) Seam-jump fix v3. The acceptance
-  criteria A1-A3 in `model_traning/accept_seam.R` are unchanged.
+* The price LSTM is retrained a second time (v3) and the seam into 2026-08 is
+  fixed. Retrained on the Mac: early stop at epoch 146, pure-R vs torch parity
+  8.8e-07 (price) / 6.8e-08 (sd). Tests: 733 PASS / 0 FAIL / 0 SKIP.
+
+  Acceptance: A1-A3 are as fixed before the first retrain.
+
+  | criterion | result | pass |
+  |---|---|---|
+  | A1: seam median in [0.99, 1.015] | 0.9920 | yes |
+  | A2: states above own Aug/Jul max <= 15% | 0.0% | yes |
+  | A3: calibration MSE below last value | 2.522 vs 3.130 | yes |
+  | A4: calibration MSE <= 0.95 x drift | 2.522 vs 2.725 | yes |
+
+  A4 was added to the acceptance before this retrain was run, after a
+  random-weight network was found to pass A1-A3, and the user was told at the
+  time. Per the session that coordinated the retrain, A4 was not chosen after
+  seeing these results.
+
+  This is the second retrain attempt. Comparison across fits:
+
+  | fit | A1 | A2 | calibration MSE | 2026-08 MSE |
+  |---|---|---|---|---|
+  | previously shipped | 1.064 | 82% | 2.224 | 3.364 |
+  | attempt 1 | 1.038 | 47% | 2.137 | 3.849 |
+  | attempt 2 (shipped) | 0.992 | 0% | 2.522 | 0.487 |
+
+  - **Baselines:** last value 0.452 for 2026-08 alone. On the calibration
+    window: drift 2.868, last value 3.130, seasonal naive 4.056. The 2026-08
+    truth was seen during the diagnosis, so the 2026-08 column is a reference
+    only.
+  - **The cost:** calibration MSE is worse than both earlier fits. Those fits'
+    lower MSE came with a badly wrong first month, so the new fit is not better
+    on every measure.
+  - **Forecasts run low.** Calibration residual medians are +1.7%, +4.3%,
+    +4.3%, +5.2%, +4.7% at h = 1..5. Every July origin from 2013 to 2026
+    under-forecasts August by roughly 0.5-2.2%. The log-ratio target pulls
+    toward the training-period drift. No bias correction is applied; the
+    early-stopping diagnostic is +0.9%, +1.3%, +2.4%, +2.2%, +2.2%.
+  - **h = 1 carries almost no cross-state information.** Predicted vs true
+    2026-08 / 07 ratios correlate at Pearson 0.09 and Spearman 0.18, and 35% of
+    states are forecast above the truth.
+  - **Coverage:** quantile reproduction drifts by 6.4e-09. Leave-one-month-out
+    coverage is 0.85, 0.89, 0.88, 0.84, 0.89 for `q_lo` / `q_hi` (nominal 90%)
+    and 0.85, 0.84, 0.83, 0.84, 0.84 for the `price_sd` band (nominal 85%).
+  - **Inputs:** at the 2026-07 origin every channel is inside its training
+    distribution. At most 2% of states are above their own training maximum,
+    and 13.7% are below their own minimum on `ann_rel_z`. Single-channel
+    ablations move the seam only within 0.991-0.997.
+  - **Biases:** `b_ih == b_hh` in the fit is expected. Both start at zero and
+    enter the gates only as a sum, so they get identical updates (the earlier
+    fits too). It has no effect on predictions.
+  - **Docs:** the README price-forecast section is rewritten with these numbers
+    and limits.
+
+  What changed in v3:
   - First attempt (v2 below, retrained on the Mac, kept on branch
     `wip/lstm-v2-attempt1`) failed acceptance: A1 1.0384, A2 47.1%, A3 2.137 vs
     3.130 (pass). In 2026-08 alone its MSE was 3.849 vs 0.452 for the last
@@ -39,8 +92,10 @@
     (report only), and the retrained model's calibration MSE must be read
     against it.
 
-* (Awaiting retrain.) Fix for the 2026-08 seam jump, prepared before the
-  retrain. `model_traning/diagnose_seam.R` showed the jump is not real: the true
+* (Superseded by v3 above: this v2 retrain, attempt 1, failed acceptance
+  with A1 1.0384, A2 47.1%, A3 2.137 and was not shipped; its fit is kept on
+  branch `wip/lstm-v2-attempt1`.) Fix for the 2026-08 seam jump, prepared before
+  the retrain. `model_traning/diagnose_seam.R` showed the jump is not real: the true
   Aug/Jul median is 0.9995 against 1.064 predicted, and in 2026-08 alone the LSTM
   has an MSE of 3.36 vs 0.45 for the last value. It comes from two sparse
   covariates that appear only at the end of the training history:
@@ -97,7 +152,7 @@
   |---|---|---|---|---|
   | previously shipped | 2.345 | +1.7, 2.6, 2.8, 4.1, 4.4% | 1.040 | 47% |
   | refit + correction | 2.274 | +3.2, 2.9, 1.1, 1.5, 2.8% | 1.040 | 61% |
-  | refit (shipped) | 2.224 | +0.9, 2.0, 1.5, 0.9, 0.3% | 1.064 | 82% |
+  | refit (shipped until the v3 retrain) | 2.224 | +0.9, 2.0, 1.5, 0.9, 0.3% | 1.064 | 82% |
 
   The jump into 2026-08 is still unexplained and is now larger (historical
   August/July median 1.0035); README documents it as a limitation.

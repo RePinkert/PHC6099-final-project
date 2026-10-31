@@ -113,54 +113,93 @@ Two limits are worth stating plainly:
 ## Price forecast: what the validation shows and what it does not
 
 Months 2026-08..2026-12 come from an LSTM whose fit ships in
-`inst/extdata/price_lstm_fit.rds` together with its baselines and coverage. It
-was refit on EIA-861M's state panel from 2010-01 (current vintage, including
-EIA's revisions to 2025-2026). The annual EIA-861 covariate for year Y now
-enters at Y+1 October, its assumed release date, so training no longer sees
-values before they were published. EIA's "Adjustment" pseudo-utility
-(eiaid 99999) is excluded. Read the numbers with these caveats:
+`inst/extdata/price_lstm_fit.rds` together with its baselines and coverage.
+- **Data:** it is trained on EIA-861M's state panel from 2010-01 (current
+  vintage) and an annual EIA-861 covariate for 2010-2025. The year-Y annual
+  value enters at Y+1 October, its assumed release date, and EIA's "Adjustment"
+  pseudo-utility (eiaid 99999) is excluded.
+- **Inputs and target are relative:** log price over its trailing 12-month mean,
+  the month-over-month change, season, and the annual value over the monthly
+  mean before its release. The target is log(P_{t+h} / P_t). There is no
+  absolute price level anywhere in the inputs.
+- **Third model of this kind:** the earlier two jumped at the seam, as the next
+  section explains.
 
-- **Use the calibration window for the comparison.** The `mse_es` column comes
-  from the early-stopping window, which chose the model, so it flatters it. The
-  calibration window (`mse_cal`, targets 2026-02..2026-07) played no part in
-  fitting or model selection: LSTM 2.22, last value 3.13, seasonal naive 4.06,
-  about 29% better than the best baseline. Likewise
-  `coverage$transfer_early_window` is measured on the early-stopping window and
-  is not independent evidence.
-- **The refit helps, modestly.** Scored on the same current-vintage truth, the
-  previously shipped model has a calibration MSE of 2.35 (vs 2.22 now). Its
-  early-stopping figure looked better (0.91) only because it had seen annual
-  averages before their release.
-- **No bias correction.** The refit first applied a per-horizon correction
-  estimated on the early-stopping window. On the calibration window it pointed
-  the other way (h = 1: -2.2% estimated vs +0.9% observed), so it raised the MSE
-  (2.27 vs 2.22) and was dropped. This choice was made after seeing the
-  calibration window, so that window is no longer fully untouched for this one
-  decision. Both versions' numbers are in NEWS. The early-stopping estimate is
-  kept as `es_bias_diagnostic`. Calibration residual medians are now +0.9%,
-  +2.0%, +1.5%, +0.9%, +0.3% at h = 1..5 (forecasts slightly low).
-- **The first forecast month jumps, and this is unresolved.** Across states the
-  median 2026-08 / 2026-07 ratio is 1.064, against a historical August/July
-  median of 1.0035, and 82% of states exceed their own largest August/July ratio
-  since 2015. The dropped correction pulled this down to 1.040 (61%), as low as
-  the previously shipped model (1.040, 47%), but it did so by shifting every
-  forecast, not by fixing the cause. Treat the 2026-08 level with care.
+### The seam into 2026-08: fixed on the second retrain
+
+The shipped forecast used to jump at its first month. The cause was found by
+pure-R ablations in `model_traning/diagnose_seam.R` and
+`diagnose_seam_channels.R`. Each fit had inputs outside what training had seen:
+- **First fit:** two covariates appeared only at the end of the training history
+  (EIA-112 disconnections for 2024 only; annual EIA-861 for 2023-2025 only).
+- **First retrain (attempt 1):** per-state min-max price and annual levels ran
+  past their training range in 65% and 71% of states.
+
+Acceptance criteria were fixed before the retrains (`model_traning/accept_seam.R`):
+- A1: the 2026-08 / 2026-07 median is in [0.99, 1.015] (historical
+  August/July median 1.0035).
+- A2: at most 15% of states exceed their own 2015-2025 August/July maximum.
+- A3: calibration MSE is below the last value.
+- A4: calibration MSE is at most 0.95 x the drift baseline. A4 was added before
+  the second retrain was run, after a random-weight network was found to pass
+  A1-A3.
+
+| fit | A1 seam median | A2 states above own max | calibration MSE | 2026-08 MSE (last value 0.452) |
+|---|---|---|---|---|
+| previously shipped | 1.064 | 82% | 2.224 | 3.364 |
+| attempt 1 | 1.038 | 47% | 2.137 | 3.849 |
+| **attempt 2 (shipped)** | **0.992** | **0%** | **2.522** | **0.487** |
+
+Calibration baselines: drift (last value x exp(mean training log change))
+2.868, last value 3.130, seasonal naive 4.056. The 2026-08 truth was looked at
+during the diagnosis, so that column is a reference, not a held-out test.
+
+### Limits of the shipped forecast
+
+- **Lower calibration accuracy than the two earlier fits.** Calibration MSE is
+  2.522, against 2.137 and 2.224. Those fits earned their lower MSE while
+  missing the first forecast month badly (2026-08 MSE 3.85 and 3.36). The
+  current fit is not better on every measure: it trades some calibration
+  accuracy for a forecast that starts where the data ends. It beats drift by
+  12% (A4) and last value by 19%.
+- **Forecasts run low.** Calibration residual medians are +1.7%, +4.3%, +4.3%,
+  +5.2%, +4.7% at h = 1..5 (positive = forecast too low), growing with the
+  horizon. Every July origin from 2013 to 2026 under-forecasts August by roughly
+  0.5-2.2%. A log-ratio target pulls toward the average drift of the training
+  years, which understates a period of fast increases. No bias correction is
+  applied: an earlier attempt at one, estimated on the early-stopping window,
+  pointed the wrong way on the calibration window.
+- **The first month carries little state-specific information.** Across states,
+  the predicted 2026-08 / 2026-07 ratio barely correlates with the true one
+  (Pearson 0.09, Spearman 0.18). In 2026-08 alone the forecast is slightly worse
+  than carrying July forward (0.487 vs 0.452). Read h = 1 as "about the last
+  observed price".
+- **Use the calibration window for comparisons.** `mse_es` comes from the
+  early-stopping window, which chose the model; `mse_cal` (targets
+  2026-02..2026-07) played no part in fitting or model selection. Likewise
+  `coverage$transfer_early_window` is not independent evidence.
+- **The two LSTM bias vectors are equal** (`b_ih == b_hh` in the fit). Both start
+  at zero and enter the gates only as a sum, so they get identical updates. The
+  model is equivalent to one bias vector, and the pure-R forward matches torch
+  (`model_traning/check_parity.R`).
+
+### Intervals
 
 `price_sd` is the Gaussian scale implied by the 85% absolute-residual quantile,
 `abs_q85 / qnorm(0.925)`. `q_lo` / `q_hi` are the 5% and 95% relative-residual
-quantiles, not symmetrized. `model_traning/check_interval_coverage.R` replays
-the validation forecasts from the shipped weights (it reproduces the frozen
-quantiles exactly) and checks coverage by leaving out one calibration month at a
-time. This is the only check that does not reuse the residuals that set the
-quantiles:
+quantiles, not symmetrized.
+
+`model_traning/check_interval_coverage.R` replays the validation forecasts from
+the shipped weights (it reproduces the frozen quantiles to 1e-8). It checks
+coverage by leaving out one calibration month at a time, the only check that
+does not reuse the residuals that set the quantiles:
 
 | interval | nominal | held-out coverage, h = 1..5 |
 |---|---|---|
-| `q_lo` / `q_hi` | 90% | 0.84, 0.89, 0.88, 0.88, 0.89 |
-| ±`qnorm(0.925)` × `price_sd` | 85% | 0.83, 0.84, 0.84, 0.85, 0.85 |
+| `q_lo` / `q_hi` | 90% | 0.85, 0.89, 0.88, 0.84, 0.89 |
+| ±`qnorm(0.925)` × `price_sd` | 85% | 0.85, 0.84, 0.83, 0.84, 0.84 |
 
-So `q_lo` / `q_hi` run slightly narrow, worst at h = 1, which rests on only two
-calibration months.
+Both run slightly narrow. h = 1 rests on only two calibration months.
 
 ## Life expectancy: a synthetic estimate
 
