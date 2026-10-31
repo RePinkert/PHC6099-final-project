@@ -206,7 +206,7 @@
   out <- lapply(unique(state), function(s) {
     w <- .lstm_feature_window(s, fit$fit_as_of)
     yn <- .lstm_forward_norm(array(w, c(1, dim(w)[1], dim(w)[2])))
-    pr_all <- .lstm_denorm(yn[1, ], s) * (1 + fit$point_bias)
+    pr_all <- .lstm_denorm(yn[1, ], s)
     k <- which(state == s)
     hh <- h[k]
     data.frame(

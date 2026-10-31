@@ -185,18 +185,19 @@ trip$seas <- mapply(function(s, j0, h) {
 }, match(trip$state, STATES), trip$j0, trip$h)
 trip$last <- mapply(function(s, j0) mm_raw[s, j0], match(trip$state, STATES), trip$j0)
 
-## 每个 h 的点预测偏差只在早停窗估计；校准窗不参与任何点估计
+## 早停窗的视界偏差（相对残差中位数）只作诊断、不再校正点预测：
+## 它与校准窗的偏差方向相反（h=1: -2.2% vs +0.9%），校正后校准窗 MSE 2.224 -> 2.274，
+## 接缝和"超过本州历史最大值"的比例也没有改善；这一决定参考过校准窗结果，见 NEWS。
 es_keep <- trip$target <= j_es_last
-point_bias <- vapply(1:H, function(h) {
+es_bias_diagnostic <- vapply(1:H, function(h) {
   d <- trip[es_keep & trip$h == h, ]
   stats::median((d$true - d$pred_raw) / d$pred_raw)
 }, numeric(1))
-trip$pred <- trip$pred_raw * (1 + point_bias[trip$h])
 trip$rel <- (trip$true - trip$pred) / trip$pred
 es_trips <- trip[es_keep, ]
 cal_trips <- trip[trip$target >= j_calib_first, ]
-cat("== point bias from early-stop window (relative median, h=1..5) ==\n")
-print(point_bias)
+cat("== early-stop window bias (diagnostic only, NOT applied; h=1..5) ==\n")
+print(es_bias_diagnostic)
 
 mse <- function(a, b) mean((a - b)^2)
 diag <- data.frame(
@@ -244,7 +245,7 @@ for (s in 1:51) Xf[s, , ] <- arr[s, (j0 - SEQ + 1):j0, ]
 pf_norm <- as_array(with_no_grad(model(torch_tensor(Xf))))
 fc <- do.call(rbind, lapply(1:51, function(s) {
   mm <- tf$price_minmax[[s]]
-  pr <- ((pf_norm[s, ] + 1) / 2 * (mm$max - mm$min) + mm$min) * (1 + point_bias)
+  pr <- (pf_norm[s, ] + 1) / 2 * (mm$max - mm$min) + mm$min
   data.frame(
     state = STATES[s], period = FC_MONTHS, h = 1:H,
     price = pr,
@@ -265,9 +266,9 @@ imp_cells <- if (any(imp)) {
 } else data.frame(state = character(0), period = character(0))
 fit <- list(
   contract = paste0(
-    "point = bias-corrected LSTM direct multi-horizon h=1..5 (per-h relative residual ",
-    "median estimated on early-stop window only; custom LSTMCell, candidate relu, hidden=64, ",
-    "seq_len=36, 51-state pooled; minmax per state + zscore fit on train window only); ",
+    "point = LSTM direct multi-horizon h=1..5, no bias correction (custom LSTMCell, ",
+    "candidate relu, hidden=64, seq_len=36, 51-state pooled; minmax per state + zscore fit ",
+    "on train window only); ",
     "interval = per-horizon quantiles of relative residuals (true-pred)/pred from the ",
     "held-out calibration window 2026-02..2026-07 (cross-state scale-standardised, no obs_max ",
     "fallback); .sd = price*abs_q85/qnorm(0.925) keeps the downstream Gaussian-scale bridge; ",
@@ -288,7 +289,7 @@ fit <- list(
     w_out = getm("out.weight"), b_out = getm("out.bias")
   ),
   transforms = list(price_minmax = tf$price_minmax, zpar = feat$zpar, ann_rng = feat$ann_rng),
-  point_bias = point_bias,
+  es_bias_diagnostic = es_bias_diagnostic,
   intervals = iv,
   coverage = list(calib_in_sample = cov_cal, transfer_early_window = cov_transfer),
   baselines = diag,

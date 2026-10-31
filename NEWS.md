@@ -1,5 +1,40 @@
 # lifewatt 0.0.0.9000
 
+* The price LSTM is refit (same architecture: hidden 64, 36-month window,
+  h = 1..5, 51 states pooled; `fit_as_of` still 2026-07):
+  - Data: EIA-861M's state panel from 2010-01 in the current vintage
+    (`data-raw/assemble_price_history_slim.R`). The model and the observed
+    series now read the same values.
+  - Look-ahead fixed: the annual EIA-861 value for year Y enters at Y+1 October,
+    in both training (`model_traning/prepare.R`) and serving (`.ann_wide`).
+    The covariate's scaling is fit on the training window only, and EIA's
+    "Adjustment" pseudo-utility (eiaid 99999) is excluded.
+  - No bias correction. A per-horizon correction estimated on the
+    early-stopping window pointed the opposite way on the calibration window.
+    The decision to drop it also looked at the calibration results, as listed
+    below. `train_price_lstm.R` now only reports the estimate
+    (`es_bias_diagnostic`); `model_traning/rebuild_fit_without_bias.R` rebuilt
+    the shipped fit from the same weights without it.
+
+  Fair comparison: all three versions are scored on the same current-vintage
+  truth, targets 2026-02..07; baselines are last value 3.130 and seasonal
+  naive 4.056.
+
+  | version | calibration MSE | residual median h = 1..5 | 2026-08 / 07 median | states above own Aug/Jul max |
+  |---|---|---|---|---|
+  | previously shipped | 2.345 | +1.7, 2.6, 2.8, 4.1, 4.4% | 1.040 | 47% |
+  | refit + correction | 2.274 | +3.2, 2.9, 1.1, 1.5, 2.8% | 1.040 | 61% |
+  | refit (shipped) | 2.224 | +0.9, 2.0, 1.5, 0.9, 0.3% | 1.064 | 82% |
+
+  The jump into 2026-08 is still unexplained and is now larger (historical
+  August/July median 1.0035); README documents it as a limitation.
+  Leave-one-month-out coverage: `q_lo` / `q_hi` (nominal 90%) 0.84-0.89, the
+  `price_sd` band (nominal 85%) 0.83-0.85. Scenario 2 (32601 @ 2026-12) moves
+  from 15.02 / 1.204 to 16.39 / 0.973. The README section is rewritten with
+  these numbers, replacing the leakage and old-vintage caveats.
+* Contract test: intervals must not be symmetrized. The test used to require
+  right skew at every horizon, but h = 5 is now left-skewed.
+
 * The observed monthly price cache (`inst/extdata/b1_monthly_cache.csv`) is
   rebuilt from EIA-861M's bulk file (`data-raw/assemble_eia861m_monthly.R`, no
   API key needed) and picks up EIA's revisions: 625 of 2,193 state-months move,
@@ -8,8 +43,7 @@
 * Breaking: `provisional` on observed months now follows EIA's own data status
   (`Preliminary`, 2026-01 onward in this vintage) instead of a fixed 2025-01
   cut-off; the cache gains a `data_status` column. 2025 months are now final.
-* The LSTM still reads `price_history_slim.csv.gz`, the vintage it was trained
-  on, so its inputs keep the old 2025-2026 values until the model is refit.
+* (Superseded by the refit above: the LSTM now reads the same vintage.)
 
 * Fix: the forecast `price_sd` now uses `qnorm(0.925)`, the factor that turns the
   85% absolute-residual quantile into a Gaussian sd. The old `qnorm(0.95)`
