@@ -29,10 +29,10 @@ CALIB_FIRST <- "2026-02"  # 区间校准目标月起点
 cat("== data ==\n")
 P <- load_price_wide(".")
 ann <- load_ann_covariate(".")
-c1 <- load_c1_covariate(".")
 tf <- fit_transforms(P, MONTHS, TRAIN_LAST)
-feat <- build_price_features(P, ann, c1, tf)
+feat <- build_price_features(P, ann, tf)
 arr <- feat$arr
+NCH <- dim(arr)[3]
 cat("price panel:", dim(P), " features:", dim(arr), "\n")
 
 im <- function(m) match(m, MONTHS)
@@ -48,7 +48,7 @@ origins_val <- seq(j_val_first - 1, j_end - H)   # 2025-06 .. 2026-02，目标 2
 
 build_xy <- function(j0s) {
   n <- length(j0s) * 51L
-  X <- array(NA_real_, c(n, SEQ, 11))
+  X <- array(NA_real_, c(n, SEQ, NCH))
   Y <- matrix(NA_real_, n, H)
   st <- character(n); o <- integer(n)
   k <- 0L
@@ -111,7 +111,7 @@ lstm_model <- nn_module(
   }
 )
 
-model <- lstm_model(11L, HID, H)
+model <- lstm_model(NCH, HID, H)
 opt <- optim_adam(model$parameters, lr = LR, weight_decay = 1e-4)
 loss_fn <- nn_mse_loss()
 
@@ -240,7 +240,7 @@ print(rbind(calib = cov_cal, transfer = cov_transfer))
 ## ---- 2026-08..12 预测（origin 2026-07）----
 j0 <- N_MONTHS
 FC_MONTHS <- sprintf("%04d-%02d", 2026, 8:12)
-Xf <- array(NA_real_, c(51, SEQ, 11))
+Xf <- array(NA_real_, c(51, SEQ, NCH))
 for (s in 1:51) Xf[s, , ] <- arr[s, (j0 - SEQ + 1):j0, ]
 pf_norm <- as_array(with_no_grad(model(torch_tensor(Xf))))
 fc <- do.call(rbind, lapply(1:51, function(s) {
@@ -272,6 +272,7 @@ fit <- list(
     "interval = per-horizon quantiles of relative residuals (true-pred)/pred from the ",
     "held-out calibration window 2026-02..2026-07 (cross-state scale-standardised, no obs_max ",
     "fallback); .sd = price*abs_q85/qnorm(0.925) keeps the downstream Gaussian-scale bridge; ",
+    "8 channels (price, mom, rel12, season, annual EIA-861 2010..2025 value/mask/age; no EIA-112), ",
     "annual EIA-861 Y value available from Y+1 October, Adjustment eiaid 99999 excluded; ",
     "early stopping on walk-forward valid 2025-07..2026-01, NOT on a test set"
   ),
@@ -281,14 +282,15 @@ fit <- list(
                         "(targets through ", TRAIN_LAST, ")"),
   valid_window = paste0("targets 2025-07..", ES_LAST, " (early stop)"),
   calib_window = paste0("targets ", CALIB_FIRST, "..2026-07 (interval quantiles)"),
-  seq_len = SEQ, n_hidden = HID, n_chan = 11L, h_max = H,
+  seq_len = SEQ, n_hidden = HID, n_chan = as.integer(NCH), h_max = H,
   chan_names = feat$chan,
   weights = list(
     w_ih = getm("cell.w_ih"), w_hh = getm("cell.w_hh"),
     b_ih = getm("cell.b_ih"), b_hh = getm("cell.b_hh"),
     w_out = getm("out.weight"), b_out = getm("out.bias")
   ),
-  transforms = list(price_minmax = tf$price_minmax, zpar = feat$zpar, ann_rng = feat$ann_rng),
+  transforms = list(price_minmax = tf$price_minmax, zpar = feat$zpar, ann_rng = feat$ann_rng,
+                    ann_source = ANN_SOURCE),
   es_bias_diagnostic = es_bias_diagnostic,
   intervals = iv,
   coverage = list(calib_in_sample = cov_cal, transfer_early_window = cov_transfer),

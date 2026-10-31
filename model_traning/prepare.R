@@ -1,8 +1,9 @@
 # prepare.R —— model_traning 分支：LSTM 训练数据装配（价格面板 + 异频协变量通道）
 # 数据源（全部树内、离线可复现）：
 #   inst/extdata/price_history_slim.csv.gz  EIA-861M 州级住宅月度电价 2010-01..2026-07
-#   inst/extdata/eia861_annual_slim.csv.gz    EIA-861 州年客户加权价（2023/2024/2025）
-#   inst/extdata/eia112_state_month_slim.csv.gz   EIA-112 断供机制（仅 2024-01..12）
+#   inst/extdata/eia861_state_annual.csv.gz   EIA-861 州年客户加权价 2010..2025（assemble_861_state_annual.R）
+# EIA-112 断供（仅 2024 年）已不再入模：向前填充后 age 外推出训练分布，是 2026-08 接缝跳幅的主因之一
+#   （model_traning/diagnose_seam.R）；年度通道原来只有 2023..2025，同样只在训练末尾出现，现补到 2010。
 #   inst/extdata/vsrr_state_quarter_slim.csv.gz   VSRR 州季死亡率（2023Q1..2025Q3）
 # 声明窗口 2023-01..2026-12 不变；训练窗允许回溯（用户 2026-10-22 决定）。
 # 异频协变量通道设计（弥合"数据源时间窗口不统一"）：每个辅助源带
@@ -46,14 +47,12 @@ load_price_wide <- function(root = ".") {
   P
 }
 
-## EIA-861 州年客户加权价：排除 Adjustment 伪 utility；Y 年终值按 Y+1 年 10 月发布
+## EIA-861 州年客户加权价（已排除 Adjustment 伪 utility）；Y 年终值按 Y+1 年 10 月发布
+ANN_SOURCE <- "eia861_state_annual"
 load_ann_covariate <- function(root = ".") {
-  a <- utils::read.csv(file.path(root, "inst", "extdata", "eia861_annual_slim.csv.gz"),
-                       stringsAsFactors = FALSE)
-  a <- a[a$eiaid != 99999 & is.finite(a$cus) & a$cus > 0, ]
-  agg <- aggregate(cbind(rev = a$price * a$cus, cus = a$cus),
-                   by = list(state = a$state, year = a$year), sum, na.rm = TRUE)
-  agg$price_w <- agg$rev / agg$cus
+  agg <- utils::read.csv(file.path(root, "inst", "extdata", "eia861_state_annual.csv.gz"),
+                         stringsAsFactors = FALSE)
+  agg$price_w <- agg$price
   V <- matrix(NA_real_, length(STATES), N_MONTHS, dimnames = list(STATES, MONTHS))
   for (i in seq_len(nrow(agg))) {
     si <- match(agg$state[i], STATES)
@@ -76,35 +75,6 @@ load_ann_covariate <- function(root = ".") {
     out
   }))
   list(value = ff, mask = mask, age = age / 60, years = sort(unique(agg$year)))
-}
-
-## EIA-112 断供 per-1k（仅 2024-01..12），向前填充；2024 前 mask=0
-load_c1_covariate <- function(root = ".") {
-  c1 <- utils::read.csv(file.path(root, "inst", "extdata", "eia112_state_month_slim.csv.gz"),
-                        stringsAsFactors = FALSE)
-  V <- matrix(NA_real_, length(STATES), N_MONTHS, dimnames = list(STATES, MONTHS))
-  for (i in seq_len(nrow(c1))) {
-    si <- match(c1$state[i], STATES)
-    if (!is.na(si) && c1$period[i] %in% MONTHS) {
-      V[si, match(c1$period[i], MONTHS)] <- c1$disconnections_per_1k[i]
-    }
-  }
-  ff <- t(apply(V, 1, function(x) {
-    for (k in seq_along(x)) if (is.na(x[k]) && k > 1) x[k] <- x[k - 1]
-    x
-  }))
-  mask <- ifelse(is.na(ff), 0, 1)
-  ff[is.na(ff)] <- 0
-  age <- t(apply(V, 1, function(x) {
-    last <- NA_real_
-    out <- rep(60, length(x))
-    for (k in seq_along(x)) {
-      if (!is.na(x[k])) last <- k
-      if (!is.na(last)) out[k] <- min(k - last, 60)
-    }
-    out
-  }))
-  list(value = ff, mask = mask, age = age / 60)
 }
 
 ## VSRR 州季 log(m)，m = 州率 / US 率（12m 与 3m 两种口径都用作训练目标）
@@ -135,8 +105,8 @@ mm_price <- function(x, mm) 2 * (x - mm$min) / (mm$max - mm$min) - 1
 
 zscore <- function(x, mu, sd) (x - mu) / sd
 
-## 价格特征阵列 [51, 307, nch]；通道名随阵列返回
-build_price_features <- function(P, ann, c1, transforms) {
+## 价格特征阵列 [51, n_months, 8]；通道名随阵列返回
+build_price_features <- function(P, ann, transforms) {
   n <- N_MONTHS
   mom <- P[, -1, drop = FALSE] / P[, -n, drop = FALSE] - 1
   mom <- cbind(NA_real_, mom)
@@ -148,18 +118,13 @@ build_price_features <- function(P, ann, c1, transforms) {
   tr <- MONTHS <= transforms$train_last
   ok_m <- is.finite(mom) & matrix(tr, 51, n, byrow = TRUE)
   ok_r <- is.finite(roll12) & matrix(tr, 51, n, byrow = TRUE)
-  ok_c <- c1$mask == 1 & matrix(tr, 51, n, byrow = TRUE)
   mu_mom <- mean(mom[ok_m]); sd_mom <- sd(mom[ok_m])
   mu_r12 <- mean(roll12[ok_r]); sd_r12 <- sd(roll12[ok_r])
-  mu_c1 <- mean(c1$value[ok_c]); sd_c1 <- sd(c1$value[ok_c])
   if (!is.finite(sd_mom) || sd_mom == 0) sd_mom <- 1
   if (!is.finite(sd_r12) || sd_r12 == 0) sd_r12 <- 1
-  if (!is.finite(sd_c1) || sd_c1 == 0) sd_c1 <- 1
   ## 缺测/掩码格填训练均值 -> z=0（中性），掩码通道另行告知
   mom[!is.finite(mom)] <- mu_mom
   roll12[!is.finite(roll12)] <- mu_r12
-  c1_z <- c1$value
-  c1_z[c1$mask == 0] <- mu_c1
 
   mm <- matrix(NA_real_, 51, n)
   ann_mm <- matrix(NA_real_, 51, n)
@@ -178,7 +143,7 @@ build_price_features <- function(P, ann, c1, transforms) {
   sin12 <- matrix(rep(sin(2 * pi * mon / 12), each = 51), 51, n)
   cos12 <- matrix(rep(cos(2 * pi * mon / 12), each = 51), 51, n)
 
-  arr <- array(NA_real_, dim = c(51, n, 11),
+  arr <- array(NA_real_, dim = c(51, n, 8),
                dimnames = list(STATES, MONTHS, NULL))
   arr[, , 1] <- mm
   arr[, , 2] <- zscore(mom, mu_mom, sd_mom)
@@ -188,13 +153,10 @@ build_price_features <- function(P, ann, c1, transforms) {
   arr[, , 6] <- ann_mm
   arr[, , 7] <- ann$mask
   arr[, , 8] <- ann$age
-  arr[, , 9] <- zscore(c1_z, mu_c1, sd_c1)
-  arr[, , 10] <- c1$mask
-  arr[, , 11] <- c1$age
   dimnames(arr)[[3]] <- c("price_mm", "mom_z", "rel12_z", "sin12", "cos12",
-                          "ann_mm", "ann_mask", "ann_age", "c1_z", "c1_mask", "c1_age")
+                          "ann_mm", "ann_mask", "ann_age")
   list(arr = arr,
-       zpar = list(mom = c(mu_mom, sd_mom), rel12 = c(mu_r12, sd_r12), c1 = c(mu_c1, sd_c1)),
+       zpar = list(mom = c(mu_mom, sd_mom), rel12 = c(mu_r12, sd_r12)),
        ann_rng = ann_rng,
        chan = dimnames(arr)[[3]])
 }
