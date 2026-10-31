@@ -1,5 +1,44 @@
 # lifewatt 0.0.0.9000
 
+* (Awaiting retrain: second attempt.) Seam-jump fix v3. The acceptance
+  criteria A1-A3 in `model_traning/accept_seam.R` are unchanged.
+  - First attempt (v2 below, retrained on the Mac, kept on branch
+    `wip/lstm-v2-attempt1`) failed acceptance: A1 1.0384, A2 47.1%, A3 2.137 vs
+    3.130 (pass). In 2026-08 alone its MSE was 3.849 vs 0.452 for the last
+    value.
+  - Diagnosis (`model_traning/diagnose_seam_channels.R`, pure-R forward on that
+    fit): the per-state minmax level channels were beyond their training range
+    at the 2026-07 origin. That was `price_mm` in 65% of states, and `ann_mm` in
+    71%, because the 2024 annual value exceeded every 2010-2023 value.
+    - Clipping both to the training range: seam median 0.999, 12% above own
+      maximum.
+    - `mom_z` and `rel12_z` were inside their training distribution, and
+      clipping them changed nothing.
+    - These are diagnostic interventions, not the fix.
+  - Fix, chosen from that evidence and not tuned on A1-A3: every price-type
+    input and the target become relative quantities.
+    - 7 channels: log price / trailing 12-month mean; month-over-month change;
+      season; log(annual EIA-861 value / mean monthly price over the 12 months
+      before its release); annual mask and age.
+    - The target is the per-horizon standardised log(P_{t+h} / P_t), served as
+      P_t * exp(mu + sd * y).
+    - Architecture, seed, `fit_as_of` and all windows are unchanged, and every
+      scaling is still fit on the training window only.
+  - The serving path dispatches on `fit$chan_names` and
+    `fit$transforms$target`. The shipped fit and the first-attempt fit serve
+    identically (checked to 0 difference). `check_feature_parity.R` also checks
+    the target transform: train vs serve 7e-15.
+  - `model_traning/smoke_train_without_torch.R` runs everything in
+    `train_price_lstm.R` except the torch training, using random weights. All
+    post-training steps ran on it.
+  - A random-weight network passes A1-A3 (1.003 / 0% / 2.876 < 3.130), because
+    with a log-ratio target it reproduces the drift baseline (last value x
+    exp(mean training log change), calibration MSE 2.868). The criteria stay
+    as fixed, but they cannot by themselves show that the network learned
+    anything. `fit$baselines` therefore now reports the drift baseline
+    (report only), and the retrained model's calibration MSE must be read
+    against it.
+
 * (Awaiting retrain.) Fix for the 2026-08 seam jump, prepared before the
   retrain. `model_traning/diagnose_seam.R` showed the jump is not real: the true
   Aug/Jul median is 0.9995 against 1.064 predicted, and in 2026-08 alone the LSTM

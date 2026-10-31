@@ -20,7 +20,7 @@ fwd1 <- function(o) {
   X <- array(NA_real_, c(length(S), fit$seq_len, fit$n_chan))
   for (i in seq_along(S)) X[i, , ] <- ns$.lstm_feature_window(S[i], o)
   yn <- ns$.lstm_forward_norm(X)
-  t(vapply(seq_along(S), function(i) ns$.lstm_denorm(yn[i, ], S[i]), numeric(fit$h_max)))
+  t(vapply(seq_along(S), function(i) ns$.lstm_denorm(yn[i, ], S[i], o), numeric(fit$h_max)))
 }
 cat("fit channels:", paste(fit$chan_names, collapse = ", "), "\n")
 

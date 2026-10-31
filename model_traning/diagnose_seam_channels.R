@@ -28,7 +28,7 @@ fwd1 <- function(ws) {
   X <- array(NA_real_, c(length(ws), dim(ws[[1]])))
   for (i in seq_along(ws)) X[i, , ] <- ws[[i]]
   yn <- ns$.lstm_forward_norm(X)
-  vapply(seq_along(S), function(i) ns$.lstm_denorm(yn[i, ], S[i])[1], numeric(1))
+  vapply(seq_along(S), function(i) ns$.lstm_denorm(yn[i, ], S[i], O)[1], numeric(1))
 }
 
 ## 每个月的通道值（取以该月为起点的输入窗最后一行），2012-12..2026-07
@@ -73,15 +73,16 @@ mk <- function(chs, mode, rows = rep(TRUE, length(wm))) { force(chs); force(mode
   w
 } }
 abl <- list(baseline = function(w, s) w)
-for (g in list(price_mm = "price_mm", mom_z = "mom_z", rel12_z = "rel12_z", ann_mm = "ann_mm",
-               season = c("sin12", "cos12"))) {
+for (g in list(price_mm = "price_mm", lrel12_z = "lrel12_z", mom_z = "mom_z", rel12_z = "rel12_z",
+               ann_mm = "ann_mm", ann_rel_z = "ann_rel_z", season = c("sin12", "cos12"))) {
+  if (!all(g %in% cn)) next  # 不同拟合的通道集不同（v2：price_mm / ann_mm；v3：lrel12_z / ann_rel_z）
   nm <- paste(g, collapse = "+")
   if (!identical(g, c("sin12", "cos12"))) {
     abl[[paste0(nm, ":clip")]] <- mk(g, "clip")
     abl[[paste0(nm, ":typical")]] <- mk(g, "typical")
     abl[[paste0(nm, ":zero")]] <- mk(g, "zero")
   }
-  if (g[1] %in% c("mom_z", "rel12_z")) {
+  if (g[1] %in% c("mom_z", "rel12_z", "lrel12_z")) {
     abl[[paste0(nm, ":typical_last12")]] <- mk(g, "typical", last12)
     abl[[paste0(nm, ":clip_last12")]] <- mk(g, "clip", last12)
   }
@@ -89,9 +90,14 @@ for (g in list(price_mm = "price_mm", mom_z = "mom_z", rel12_z = "rel12_z", ann_
 abl[["season:shift_back_1m"]] <- function(w, s) {
   m <- wmon - 1L; w[, match("sin12", cn)] <- sin(2 * pi * m / 12); w[, match("cos12", cn)] <- cos(2 * pi * m / 12); w }
 abl[["ann_mask+age:typical"]] <- mk(c("ann_mask", "ann_age"), "typical")
-abl[["mom_z+rel12_z:typical_last12"]] <- mk(c("mom_z", "rel12_z"), "typical", last12)
-abl[["price_mm+ann_mm:clip"]] <- mk(c("price_mm", "ann_mm"), "clip")
-abl[["price_mm+mom_z+rel12_z+ann_mm:clip"]] <- mk(c("price_mm", "mom_z", "rel12_z", "ann_mm"), "clip")
+combo <- list(`mom_z+rel12_z:typical_last12` = list(c("mom_z", "rel12_z"), "typical", last12),
+              `mom_z+lrel12_z:typical_last12` = list(c("mom_z", "lrel12_z"), "typical", last12),
+              `price_mm+ann_mm:clip` = list(c("price_mm", "ann_mm"), "clip", rep(TRUE, length(wm))),
+              `price_mm+mom_z+rel12_z+ann_mm:clip` = list(c("price_mm", "mom_z", "rel12_z", "ann_mm"), "clip",
+                                                          rep(TRUE, length(wm))),
+              `all_continuous:clip` = list(intersect(c("price_mm", "lrel12_z", "mom_z", "rel12_z", "ann_mm",
+                                                       "ann_rel_z"), cn), "clip", rep(TRUE, length(wm))))
+for (nm in names(combo)) if (all(combo[[nm]][[1]] %in% cn)) abl[[nm]] <- do.call(mk, combo[[nm]])
 obs <- ph[, O]
 ablation <- t(sapply(abl, function(f) {
   r <- fwd1(lapply(S, function(s) f(win[[s]], s))) / obs
@@ -104,7 +110,8 @@ ann_src <- data.frame(state = S,
   train_max_value = sapply(S, function(s) max(a$price[a$state == s & a$year <= 2023])),
   value_2024 = sapply(S, function(s) a$price[a$state == s & a$year == 2024]))
 ann_src$above <- ann_src$value_2024 > ann_src$train_max_value
-ann_src$ann_mm_at_origin <- ser[, O, "ann_mm"]
+ann_k <- intersect(c("ann_mm", "ann_rel_z"), cn)[1]
+ann_src$ann_channel_at_origin <- ser[, O, ann_k]
 
 ## 回测：每个起点 h=1 预测/末值 vs 真实（中位数），按年汇总
 bt <- utils::read.csv(file.path(out_dir, "seam_backtest_all_origins.csv"), stringsAsFactors = FALSE)
@@ -122,5 +129,5 @@ res <- list(position_at_origin = pos, ablation = ablation, ann_source = ann_src,
 saveRDS(res, file.path(out_dir, "seam_channels.rds"))
 op <- options(digits = 4, width = 140)
 for (nm in setdiff(names(res), "ann_source")) { cat("\n==", nm, "==\n"); print(res[[nm]]) }
-cat("\n== ann_source (head) ==\n"); print(head(ann_src[order(-ann_src$ann_mm_at_origin), ], 8), row.names = FALSE)
+cat("\n== ann_source (head) ==\n"); print(head(ann_src[order(-ann_src$ann_channel_at_origin), ], 8), row.names = FALSE)
 options(op)

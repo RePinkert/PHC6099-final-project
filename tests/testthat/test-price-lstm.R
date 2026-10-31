@@ -118,7 +118,7 @@ test_that("frozen calibration quantiles reproduce from the shipped weights and d
     j0 <- match(o, months)
     for (s in rownames(ph)) {
       w <- ns$.lstm_feature_window(s, o)
-      y <- ns$.lstm_denorm(ns$.lstm_forward_norm(array(w, c(1, dim(w))))[1, ], s)
+      y <- ns$.lstm_denorm(ns$.lstm_forward_norm(array(w, c(1, dim(w))))[1, ], s, o)
       for (h in seq_len(fit$h_max)) {
         if (j0 + h <= length(months) && months[j0 + h] >= "2026-02") {
           rel[[length(rel) + 1L]] <- c(h = h, r = (ph[s, j0 + h] - y[h]) / y[h])
@@ -157,4 +157,38 @@ test_that("feature window is built from fit$chan_names (old 11-channel fit and r
   w <- lifewatt:::.lstm_feature_window("FL", fit$fit_as_of)
   expect_equal(dim(w), c(fit$seq_len, fit$n_chan))
   expect_equal(length(fit$chan_names), fit$n_chan)
+})
+
+test_that("logratio fits (v3) denormalise from the origin price and refuse without it", {
+  real <- lifewatt:::.price_lstm_fit()
+  probe <- real
+  probe$transforms$target <- list(type = "logratio", mu = c(0.001, 0.002, 0.003, 0.004, 0.005),
+                                  sd = c(0.03, 0.04, 0.05, 0.06, 0.07))
+  local_mocked_bindings(.price_lstm_fit = function() probe, .package = "lifewatt")
+  p0 <- lifewatt:::.price_history_wide()["FL", "2026-07"]
+  y <- c(0, 1, -1, 0.5, 2)
+  expect_equal(lifewatt:::.lstm_denorm(y, "FL", "2026-07"),
+               p0 * exp(probe$transforms$target$mu + probe$transforms$target$sd * y), tolerance = 1e-12)
+  expect_error(lifewatt:::.lstm_denorm(y, "FL"), "needs the origin month")
+})
+
+test_that("v3 relative channels match their definitions (log price / 12-month mean; annual / pre-release mean)", {
+  real <- lifewatt:::.price_lstm_fit()
+  probe <- list(seq_len = 36L, n_chan = 7L, h_max = 5L, fit_as_of = "2026-07",
+                chan_names = c("lrel12_z", "mom_z", "sin12", "cos12", "ann_rel_z", "ann_mask", "ann_age"),
+                transforms = list(zpar = list(mom = c(0, 1), lrel12 = c(0, 1), ann_rel = c(0, 1)),
+                                  ann_source = "eia861_state_annual",
+                                  target = list(type = "logratio", mu = rep(0, 5), sd = rep(1, 5))))
+  local_mocked_bindings(.price_lstm_fit = function() probe, .package = "lifewatt")
+  w <- lifewatt:::.lstm_feature_window("FL", "2026-07")
+  p <- lifewatt:::.price_history_wide()["FL", ]
+  M <- names(p); j <- match("2026-07", M)
+  expect_equal(w[36, 1], log(p[[j]] / mean(p[(j - 11):j])), tolerance = 1e-12)
+  ## 2026-07 起点可用的最新年度值是 2024 年（2025-10 发布）
+  a <- utils::read.csv(system.file("extdata", "eia861_state_annual.csv.gz", package = "lifewatt"))
+  a24 <- a$price[a$state == "FL" & a$year == 2024]
+  k <- match("2025-10", M)
+  expect_equal(w[36, 5], log(a24 / mean(p[(k - 12):(k - 1)])), tolerance = 1e-12)
+  expect_equal(w[36, 6], 1)
+  expect_equal(w[36, 7], 9 / 60)
 })

@@ -69,6 +69,26 @@
   .ffill_age(V)
 }
 
+## v3 年度通道：log(Y 年年度值 / 发布时点（Y+1 年 10 月）前 12 个月月度均价)，向前填充 + mask/age
+.ann_rel_wide <- function(months, Ph, source = "eia861_state_annual") {
+  if (!identical(source, "eia861_state_annual")) {
+    stop("relative annual channel needs the state annual table (ann_source = eia861_state_annual).",
+         call. = FALSE)
+  }
+  agg <- utils::read.csv(system.file("extdata", "eia861_state_annual.csv.gz", package = "lifewatt"),
+                         stringsAsFactors = FALSE)
+  sts <- dimnames(Ph)[[1]]
+  V <- matrix(NA_real_, length(sts), length(months), dimnames = list(sts, months))
+  for (i in seq_len(nrow(agg))) {
+    si <- match(agg$state[i], sts)
+    j <- match(sprintf("%04d-10", agg$year[i] + 1L), months)
+    if (!is.na(si) && !is.na(j) && j > 12) {
+      V[si, j] <- log(agg$price[i] / mean(Ph[si, months[(j - 12):(j - 1)]]))
+    }
+  }
+  .ffill_age(V)
+}
+
 ## EIA-112 断供 per-1k（仅 2024）：向前填充；通道语义同训练侧
 .c1_wide <- function(months) {
   c1 <- utils::read.csv(system.file("extdata", "eia112_state_month_slim.csv.gz", package = "lifewatt"),
@@ -128,24 +148,41 @@
     (x - par[1]) / par[2]
   }
   src <- fit$transforms$ann_source
-  ann <- .ann_wide(months, if (is.null(src)) "eia861_annual_slim" else src)
-  ann_rng <- fit$transforms$ann_rng
-  if (is.null(rownames(ann_rng))) {
-    stop("LSTM fit corrupt: transforms$ann_rng lacks state rownames.", call. = FALSE)
+  if (is.null(src)) src <- "eia861_annual_slim"
+  ## 旧拟合的 minmax 年度通道（ann_mm）；v3 用相对量 ann_rel_z。两者共用 mask/age（发布时点相同）
+  ann <- if ("ann_mm" %in% fit$chan_names) .ann_wide(months, src) else .ann_rel_wide(months, Ph, src)
+  ann_mm <- function() {
+    ann_rng <- fit$transforms$ann_rng
+    if (is.null(rownames(ann_rng))) {
+      stop("LSTM fit corrupt: transforms$ann_rng lacks state rownames.", call. = FALSE)
+    }
+    rng <- ann_rng[state, ]
+    x <- 2 * (ann$value[s, ] - rng[1]) / (rng[2] - rng[1]) - 1
+    x[ann$mask[s, ] == 0] <- 0
+    x[idx]
   }
-  rng <- ann_rng[state, ]
-  ann_mm <- 2 * (ann$value[s, ] - rng[1]) / (rng[2] - rng[1]) - 1
-  ann_mm[ann$mask[s, ] == 0] <- 0
+  ann_rel_z <- function() {
+    x <- (ann$value[s, ] - zp$ann_rel[1]) / zp$ann_rel[2]
+    x[ann$mask[s, ] == 0] <- 0
+    x[idx]
+  }
 
-  ## 通道按 fit$chan_names 取（旧拟合 11 通道含 EIA-112 c1；重训后去掉 c1）
+  ## 通道按 fit$chan_names 取：旧拟合 11 通道（含 EIA-112 c1）、v2 8 通道（minmax 水平）、
+  ## v3 7 通道（全部相对量，见 model_traning/prepare.R）
   mon <- as.integer(substr(win_months, 6, 7))
   ch <- list(
     price_mm = function() 2 * (p[idx] - mm$min) / (mm$max - mm$min) - 1,
+    lrel12_z = function() {
+      x <- rep(NA_real_, length(p))
+      for (k in 12:length(p)) x[k] <- log(p[k] / mean(p[(k - 11):k]))
+      zz(x, zp$lrel12)[idx]
+    },
     mom_z = function() zz(mom, zp$mom)[idx],
     rel12_z = function() zz(rel12, zp$rel12)[idx],
     sin12 = function() sin(2 * pi * mon / 12),
     cos12 = function() cos(2 * pi * mon / 12),
-    ann_mm = function() ann_mm[idx],
+    ann_mm = ann_mm,
+    ann_rel_z = ann_rel_z,
     ann_mask = function() ann$mask[s, idx],
     ann_age = function() ann$age[s, idx],
     c1_z = function() { v <- c1v()$value[s, ]; z <- zz(v, zp$c1); z[c1v()$mask[s, ] == 0] <- 0; z[idx] },
@@ -188,8 +225,18 @@
   sweep(Hm %*% t(W$w_out), 2, W$b_out, "+")
 }
 
-.lstm_denorm <- function(y_norm, state) {
-  mm <- .price_lstm_fit()$transforms$price_minmax[[state]]
+## 归一空间 -> 美分/kWh。旧拟合：按州 minmax；v3（transforms$target$type = "logratio"）：
+## y = 标准化的 log(P_{t+h}/P_t)，需要起点月 origin 的观测价 P_t。
+.lstm_denorm <- function(y_norm, state, origin = NULL) {
+  fit <- .price_lstm_fit()
+  tt <- fit$transforms$target
+  if (!is.null(tt) && identical(tt$type, "logratio")) {
+    if (is.null(origin)) stop("logratio LSTM fit: .lstm_denorm() needs the origin month.", call. = FALSE)
+    p0 <- .price_history_wide()[state, origin]
+    h <- seq_along(y_norm)
+    return(p0 * exp(tt$mu[h] + tt$sd[h] * y_norm))
+  }
+  mm <- fit$transforms$price_minmax[[state]]
   (y_norm + 1) / 2 * (mm$max - mm$min) + mm$min
 }
 
@@ -223,7 +270,7 @@
   out <- lapply(unique(state), function(s) {
     w <- .lstm_feature_window(s, fit$fit_as_of)
     yn <- .lstm_forward_norm(array(w, c(1, dim(w)[1], dim(w)[2])))
-    pr_all <- .lstm_denorm(yn[1, ], s)
+    pr_all <- .lstm_denorm(yn[1, ], s, fit$fit_as_of)
     k <- which(state == s)
     hh <- h[k]
     data.frame(
