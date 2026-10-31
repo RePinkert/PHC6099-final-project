@@ -2,7 +2,9 @@
 # 权重/变换：inst/extdata/price_lstm_fit.rds（model_traning 分支训练，冻结产物）
 # 契约（$contract）：点 = 自写 LSTMCell(candidate=relu, hidden=64) 多视界直出 h=1..5；
 #   区间 = 留出校准窗（目标月 2026-02..2026-07）相对残差视界分位数（跨州尺度标准化）；
-#   .sd = price * abs_q85 / qnorm(0.95) 保留下游 bill 证据的高斯标度桥。
+#   .sd = price * abs_q85 / qnorm(0.925) 保留下游 bill 证据的高斯标度桥：abs_q85 是 |残差| 的
+#   85% 分位，正态下 P(|e| <= k*sd) = 0.85 给 k = qnorm(0.925) ≈ 1.44（冻结 fit 的 contract
+#   字符串写的是 qnorm(0.95)，那会把 sd 低估约 12.5%；以此处为准）。
 # 特征通道（11）与训练侧 model_traning/prepare.R 同口径：
 #   price_mm / mom_z / rel12_z / sin12 / cos12 / ann_mm / ann_mask / ann_age /
 #   c1_z / c1_mask / c1_age —— 异频协变量（EIA-861 年、EIA-112 仅 2024）带
@@ -41,17 +43,18 @@
   }
 })
 
-## EIA-861 州年客户加权价（2023/24/25）：盖章 Y-01、向前填充；通道语义同训练侧
+## EIA-861 州年客户加权价：排除 Adjustment；Y 年值从 Y+1 年 10 月起可用
 .ann_wide <- function(months) {
   a <- utils::read.csv(system.file("extdata", "eia861_annual_slim.csv.gz", package = "lifewatt"),
                        stringsAsFactors = FALSE)
   sts <- dimnames(.price_history_wide())[[1]]
+  a <- a[a$eiaid != 99999 & is.finite(a$cus) & a$cus > 0, ]
   agg <- stats::aggregate(cbind(wsum = a$price * a$cus, cus = a$cus),
                           by = list(state = a$state, year = a$year), sum, na.rm = TRUE)
   V <- matrix(NA_real_, length(sts), length(months), dimnames = list(sts, months))
   for (i in seq_len(nrow(agg))) {
     si <- match(agg$state[i], sts)
-    stamp <- sprintf("%04d-01", agg$year[i])
+    stamp <- sprintf("%04d-10", agg$year[i] + 1L)
     if (!is.na(si) && stamp %in% months) V[si, match(stamp, months)] <- agg$wsum[i] / agg$cus[i]
   }
   .ffill_age(V)
@@ -209,7 +212,7 @@
     data.frame(
       state = s, period = period[k], h = hh,
       price = pr_all[hh],
-      .sd = pr_all[hh] * iv$abs_q85[hh] / stats::qnorm(0.95),
+      .sd = pr_all[hh] * iv$abs_q85[hh] / stats::qnorm(0.925),
       q_lo = pr_all[hh] * (1 + iv$r_q05[hh]),
       q_hi = pr_all[hh] * (1 + iv$r_q95[hh]),
       stringsAsFactors = FALSE, row.names = NULL

@@ -55,6 +55,13 @@
                 note = "bill alone: implied usage only, no posterior (declared contract)"))
   }
   p_meas <- bill * 100 / usage
+  # 合理性：美国住宅电价（EIA-861 utility 年价）几乎全在 1..100 cents/kWh；
+  # 超出 [1, 150] 的局部测量多半是单位或位数错误，拒绝而不是把它当证据
+  if (p_meas < 1 || p_meas > 150) {
+    stop(sprintf(paste0("bill / usage implies %.1f cents/kWh, outside the plausible 1..150 range; ",
+                        "check units (bill in USD per month, usage in kWh per month)."), p_meas),
+         call. = FALSE)
+  }
   if (is.finite(price_sd)) {
     w_m <- 1 / meas_sd^2
     w_p <- 1 / price_sd^2
@@ -64,9 +71,11 @@
          implied_usage = implied,
          note = sprintf("inverse-variance blend, declared meas_sd=%.4f cents/kWh", meas_sd))
   } else {
-    list(regime = "measured_local", price_meas = p_meas, posterior = p_meas,
-         posterior_sd = meas_sd, implied_usage = implied,
-         note = "observed regime: local measurement reported alongside the measured state price")
+    # 实测月份没有先验 sd，无从合成：本地测量只放 price_meas，后验列留空，免得把用户自报值叫"后验"
+    list(regime = "measured_local", price_meas = p_meas, posterior = NULL,
+         posterior_sd = NULL, implied_usage = implied,
+         note = paste0("observed regime: no posterior (the measured state price has no prior sd); ",
+                       "the local measurement is in price_meas"))
   }
 }
 

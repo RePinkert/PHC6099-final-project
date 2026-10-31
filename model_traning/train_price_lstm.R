@@ -174,11 +174,10 @@ trip <- data.frame(
 trip$pred <- mapply(function(s, p) {
   mm <- tf$price_minmax[[s]]; (p + 1) / 2 * (mm$max - mm$min) + mm$min
 }, trip$state, trip$pred_norm)
+trip$pred_raw <- trip$pred
 trip$true <- mapply(function(s, p) {
   mm <- tf$price_minmax[[s]]; (p + 1) / 2 * (mm$max - mm$min) + mm$min
 }, trip$state, trip$true_norm)
-trip$rel <- (trip$true - trip$pred) / trip$pred
-
 ## 基线：季节朴素（t+h-12）与末值（t）——须在子集切分前算好
 mm_raw <- P
 trip$seas <- mapply(function(s, j0, h) {
@@ -186,8 +185,19 @@ trip$seas <- mapply(function(s, j0, h) {
 }, match(trip$state, STATES), trip$j0, trip$h)
 trip$last <- mapply(function(s, j0) mm_raw[s, j0], match(trip$state, STATES), trip$j0)
 
-es_trips <- trip[trip$target <= j_es_last, ]
+## 早停窗的视界偏差（相对残差中位数）只作诊断、不再校正点预测：
+## 它与校准窗的偏差方向相反（h=1: -2.2% vs +0.9%），校正后校准窗 MSE 2.224 -> 2.274，
+## 接缝和"超过本州历史最大值"的比例也没有改善；这一决定参考过校准窗结果，见 NEWS。
+es_keep <- trip$target <= j_es_last
+es_bias_diagnostic <- vapply(1:H, function(h) {
+  d <- trip[es_keep & trip$h == h, ]
+  stats::median((d$true - d$pred_raw) / d$pred_raw)
+}, numeric(1))
+trip$rel <- (trip$true - trip$pred) / trip$pred
+es_trips <- trip[es_keep, ]
 cal_trips <- trip[trip$target >= j_calib_first, ]
+cat("== early-stop window bias (diagnostic only, NOT applied; h=1..5) ==\n")
+print(es_bias_diagnostic)
 
 mse <- function(a, b) mean((a - b)^2)
 diag <- data.frame(
@@ -239,7 +249,7 @@ fc <- do.call(rbind, lapply(1:51, function(s) {
   data.frame(
     state = STATES[s], period = FC_MONTHS, h = 1:H,
     price = pr,
-    sd = pr * iv$abs_q85 / stats::qnorm(0.95),
+    sd = pr * iv$abs_q85 / stats::qnorm(0.925),
     q_lo = pr * (1 + iv$r_q05), q_hi = pr * (1 + iv$r_q95),
     stringsAsFactors = FALSE
   )
@@ -256,16 +266,19 @@ imp_cells <- if (any(imp)) {
 } else data.frame(state = character(0), period = character(0))
 fit <- list(
   contract = paste0(
-    "point = LSTM direct multi-horizon h=1..5 (custom LSTMCell, candidate relu, hidden=64, ",
-    "seq_len=36, 51-state pooled; minmax per state + zscore fit on train window only); ",
+    "point = LSTM direct multi-horizon h=1..5, no bias correction (custom LSTMCell, ",
+    "candidate relu, hidden=64, seq_len=36, 51-state pooled; minmax per state + zscore fit ",
+    "on train window only); ",
     "interval = per-horizon quantiles of relative residuals (true-pred)/pred from the ",
     "held-out calibration window 2026-02..2026-07 (cross-state scale-standardised, no obs_max ",
-    "fallback); .sd = price*abs_q85/qnorm(0.95) keeps the downstream Gaussian-scale bridge; ",
+    "fallback); .sd = price*abs_q85/qnorm(0.925) keeps the downstream Gaussian-scale bridge; ",
+    "annual EIA-861 Y value available from Y+1 October, Adjustment eiaid 99999 excluded; ",
     "early stopping on walk-forward valid 2025-07..2026-01, NOT on a test set"
   ),
   fit_as_of = "2026-07",
   forecast_window = "2026-08..2026-12",
-  train_window = paste0("input origins 2004-01..2025-01 (targets through ", TRAIN_LAST, ")"),
+  train_window = paste0("price history 2010-01..2026-07; input origins 2012-12..2025-01 ",
+                        "(targets through ", TRAIN_LAST, ")"),
   valid_window = paste0("targets 2025-07..", ES_LAST, " (early stop)"),
   calib_window = paste0("targets ", CALIB_FIRST, "..2026-07 (interval quantiles)"),
   seq_len = SEQ, n_hidden = HID, n_chan = 11L, h_max = H,
@@ -276,6 +289,7 @@ fit <- list(
     w_out = getm("out.weight"), b_out = getm("out.bias")
   ),
   transforms = list(price_minmax = tf$price_minmax, zpar = feat$zpar, ann_rng = feat$ann_rng),
+  es_bias_diagnostic = es_bias_diagnostic,
   intervals = iv,
   coverage = list(calib_in_sample = cov_cal, transfer_early_window = cov_transfer),
   baselines = diag,

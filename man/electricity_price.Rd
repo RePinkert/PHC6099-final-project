@@ -27,7 +27,7 @@ ZIP code belongs to. The annual ZIP-level estimate blends EIA-861 utility prices
 ZIP, weighted by each utility's 2020 population share inside the ZIP (census blocks
 x HIFLD service territories); ZIPs without a share fall back to system-wide
 residential customers, and \code{weight_basis} says which applied. The monthly series is the B1 state-level
-retail-sales cache (2023-01 to 2026-07); months from 2025-01 onward are provisional
+retail-sales cache (2023-01 to 2026-07); months EIA marks Preliminary are provisional
 and flagged.
 }
 \examples{

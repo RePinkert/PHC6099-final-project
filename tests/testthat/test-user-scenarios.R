@@ -73,7 +73,7 @@ test_that("scenario 6: 年度 ZIP 价与同比（A1 x A2 客户加权）", {
   expect_equal(ty$change[1], p24 - p23, tolerance = 1e-9)
 })
 
-test_that("scenario 7: 逐月序列（mom 43 行，provisional 分界 2025-01）", {
+test_that("scenario 7: 逐月序列（mom 43 行，provisional = EIA Preliminary，2026-01 起）", {
   m <- electricity_price(anchor_zip_fl, period = "mom")
   expect_equal(nrow(m), 43L)
   expect_false(m$provisional[1])

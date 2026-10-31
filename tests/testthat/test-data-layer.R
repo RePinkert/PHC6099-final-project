@@ -1,6 +1,6 @@
 test_that("extdata layer ships readable B1 cache", {
   d <- lifewatt:::.monthly_cache()
-  expect_equal(colnames(d), c("state", "period", "price"))
+  expect_equal(colnames(d), c("state", "period", "price", "data_status"))
   expect_setequal(unique(d$state), c(state.abb, "DC"))
   expect_equal(nrow(d), 2193L)
   expect_equal(min(d$period), "2023-01")

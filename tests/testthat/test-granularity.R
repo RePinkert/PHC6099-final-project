@@ -33,8 +33,8 @@ test_that("annual multi-utility price reports the utility range, not just a poin
 
 test_that("within-state spread equals an independent customer-weighted sd", {
   slim <- lifewatt:::.annual_slim()
-  s <- slim[slim$year == 2024 & slim$state == "FL" & is.finite(slim$price) & slim$price > 0 &
-              is.finite(slim$cus) & slim$cus > 0, ]
+  s <- slim[slim$year == 2024 & slim$state == "FL" & slim$eiaid != "99999" &
+              is.finite(slim$price) & slim$price > 0 & is.finite(slim$cus) & slim$cus > 0, ]
   mu <- weighted.mean(s$price, s$cus)
   want <- sqrt(sum(s$cus * (s$price - mu)^2) / sum(s$cus))
   got <- lifewatt:::.within_state_spread("FL", 2024)
@@ -103,4 +103,15 @@ test_that("a ZIP without population shares falls back to system-wide customers, 
   expect_true(is.na(r$share_overlap_frac))
   expect_match(r$weight_scheme, "not the within-zip share", fixed = TRUE)
   expect_equal(r$level, "utility (customer-weighted to zip)")
+})
+
+test_that("within-state spread ignores EIA state-adjustment pseudo-utilities", {
+  slim <- lifewatt:::.annual_slim()
+  adj <- slim[slim$eiaid == "99999" & slim$year == 2023 & slim$state == "AL", ]
+  expect_equal(nrow(adj), 1L)
+  expect_gt(adj$cus, 0)  # positive customers, so only the eiaid filter keeps it out
+  s <- slim[slim$year == 2023 & slim$state == "AL" & slim$eiaid != "99999" & slim$cus > 0, ]
+  mu <- weighted.mean(s$price, s$cus)
+  want <- sqrt(sum(s$cus * (s$price - mu)^2) / sum(s$cus))
+  expect_equal(lifewatt:::.within_state_spread("AL", 2023)$sd, want, tolerance = 1e-12)
 })

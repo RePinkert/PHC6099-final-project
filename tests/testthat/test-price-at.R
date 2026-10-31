@@ -11,11 +11,17 @@ test_that("observed branch returns cache-verbatim price (anchor: 32601 FL)", {
   expect_true(grepl("Gainesville Regional", r$utilities))
 })
 
-test_that("provisional boundary is 2025-01 (B1 final/provisional two layers)", {
-  final_row <- lifewatt:::.price_at("32601", "2024-12")
-  provisional_row <- lifewatt:::.price_at("32601", "2025-01")
-  expect_false(final_row$provisional)
-  expect_true(provisional_row$provisional)
+test_that("provisional follows EIA-861M data status (Final 2025-12 / Preliminary 2026-01)", {
+  b1 <- lifewatt:::.monthly_cache()
+  expect_setequal(unique(b1$data_status), c("Final", "Preliminary"))
+  expect_equal(min(b1$period[b1$data_status == "Preliminary"]), "2026-01")
+  expect_false(lifewatt:::.price_at("32601", "2025-12")$provisional)
+  expect_true(lifewatt:::.price_at("32601", "2026-01")$provisional)
+})
+
+test_that("refreshed cache carries EIA's revisions (MD 2026-03 initial 35.85 -> 22.2)", {
+  b1 <- lifewatt:::.monthly_cache()
+  expect_equal(b1$price[b1$state == "MD" & b1$period == "2026-03"], 22.2)
 })
 
 test_that("AK 2023-01 pin value from the raw cache (21.73; 99501 -> AK)", {
