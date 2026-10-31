@@ -11,8 +11,8 @@
     Code
       print(r[, c("zip", "period", "price", "price_sd", "regime", "fit_as_of")])
     Output
-          zip  period    price  price_sd    regime fit_as_of
-      1 32601 2026-12 16.38732 0.9728251 predicted   2026-07
+          zip  period    price price_sd    regime fit_as_of
+      1 32601 2026-12 15.15084 1.167262 predicted   2026-07
 
 # scenario 9: 讲不通的输入会被指名拒绝（快照锁定用户可见报错文本）
 
