@@ -81,8 +81,11 @@ test_that("lstm fit contract ledger is intact", {
                     fit$forecast$price < fit$forecast$q_hi))
   ## 85% 区间覆盖率台账在验收带 [0.85, 0.95]（校准口径）
   expect_true(all(fit$coverage$calib_in_sample >= 0.80))
-  ## 残差右偏必须可见（q95 > |q05|），不做对称化
-  expect_true(all(fit$intervals$r_q95 > abs(fit$intervals$r_q05)))
+  ## 区间直接取残差的 5%/95% 分位，不做对称化（偏斜方向随 h 变化：h=1..4 右偏，h=5 左偏）
+  expect_true(all(abs(fit$intervals$r_q95 + fit$intervals$r_q05) > 1e-6))
+  ## 去掉偏差校正后不再携带 point_bias；早停窗偏差只作诊断
+  expect_null(fit$point_bias)
+  expect_length(fit$es_bias_diagnostic, fit$h_max)
 })
 
 test_that("package prediction path carries no torch dependency", {
@@ -115,7 +118,7 @@ test_that("frozen calibration quantiles reproduce from the shipped weights and d
     j0 <- match(o, months)
     for (s in rownames(ph)) {
       w <- ns$.lstm_feature_window(s, o)
-      y <- ns$.lstm_denorm(ns$.lstm_forward_norm(array(w, c(1, dim(w))))[1, ], s) * (1 + fit$point_bias)
+      y <- ns$.lstm_denorm(ns$.lstm_forward_norm(array(w, c(1, dim(w))))[1, ], s)
       for (h in seq_len(fit$h_max)) {
         if (j0 + h <= length(months) && months[j0 + h] >= "2026-02") {
           rel[[length(rel) + 1L]] <- c(h = h, r = (ph[s, j0 + h] - y[h]) / y[h])

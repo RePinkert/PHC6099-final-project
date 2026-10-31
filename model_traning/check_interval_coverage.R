@@ -20,8 +20,7 @@ for (o in months[match("2025-06", months):match("2026-02", months)]) {
   j0 <- match(o, months)
   for (s in rownames(ph)) {
     w <- ns$.lstm_feature_window(s, o)
-    # 与服务端同口径：反归一化后乘 (1 + point_bias)（早停窗估计的视界偏差校正）
-    y <- ns$.lstm_denorm(ns$.lstm_forward_norm(array(w, c(1, dim(w))))[1, ], s) * (1 + fit$point_bias)
+    y <- ns$.lstm_denorm(ns$.lstm_forward_norm(array(w, c(1, dim(w))))[1, ], s)
     for (h in seq_len(H)) {
       if (j0 + h <= length(months)) {
         trips[[length(trips) + 1L]] <- data.frame(state = s, origin = o, h = h, target = months[j0 + h],
