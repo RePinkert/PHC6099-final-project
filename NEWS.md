@@ -1,5 +1,133 @@
 # lifewatt 0.0.0.9000
 
+* The price LSTM is retrained a second time (v3) and the seam into 2026-08 is
+  fixed. Retrained on the Mac: early stop at epoch 146, pure-R vs torch parity
+  8.8e-07 (price) / 6.8e-08 (sd). Tests: 733 PASS / 0 FAIL / 0 SKIP.
+
+  Acceptance: A1-A3 are as fixed before the first retrain.
+
+  | criterion | result | pass |
+  |---|---|---|
+  | A1: seam median in [0.99, 1.015] | 0.9920 | yes |
+  | A2: states above own Aug/Jul max <= 15% | 0.0% | yes |
+  | A3: calibration MSE below last value | 2.522 vs 3.130 | yes |
+  | A4: calibration MSE <= 0.95 x drift | 2.522 vs 2.725 | yes |
+
+  A4 was added to the acceptance before this retrain was run, after a
+  random-weight network was found to pass A1-A3, and the user was told at the
+  time. Per the session that coordinated the retrain, A4 was not chosen after
+  seeing these results.
+
+  This is the second retrain attempt. Comparison across fits:
+
+  | fit | A1 | A2 | calibration MSE | 2026-08 MSE |
+  |---|---|---|---|---|
+  | previously shipped | 1.064 | 82% | 2.224 | 3.364 |
+  | attempt 1 | 1.038 | 47% | 2.137 | 3.849 |
+  | attempt 2 (shipped) | 0.992 | 0% | 2.522 | 0.487 |
+
+  - **Baselines:** last value 0.452 for 2026-08 alone. On the calibration
+    window: drift 2.868, last value 3.130, seasonal naive 4.056. The 2026-08
+    truth was seen during the diagnosis, so the 2026-08 column is a reference
+    only.
+  - **The cost:** calibration MSE is worse than both earlier fits. Those fits'
+    lower MSE came with a badly wrong first month, so the new fit is not better
+    on every measure.
+  - **Forecasts run low.** Calibration residual medians are +1.7%, +4.3%,
+    +4.3%, +5.2%, +4.7% at h = 1..5. Every July origin from 2013 to 2026
+    under-forecasts August by roughly 0.5-2.2%. The log-ratio target pulls
+    toward the training-period drift. No bias correction is applied; the
+    early-stopping diagnostic is +0.9%, +1.3%, +2.4%, +2.2%, +2.2%.
+  - **h = 1 carries almost no cross-state information.** Predicted vs true
+    2026-08 / 07 ratios correlate at Pearson 0.09 and Spearman 0.18, and 35% of
+    states are forecast above the truth.
+  - **Coverage:** quantile reproduction drifts by 6.4e-09. Leave-one-month-out
+    coverage is 0.85, 0.89, 0.88, 0.84, 0.89 for `q_lo` / `q_hi` (nominal 90%)
+    and 0.85, 0.84, 0.83, 0.84, 0.84 for the `price_sd` band (nominal 85%).
+  - **Inputs:** at the 2026-07 origin every channel is inside its training
+    distribution. At most 2% of states are above their own training maximum,
+    and 13.7% are below their own minimum on `ann_rel_z`. Single-channel
+    ablations move the seam only within 0.991-0.997.
+  - **Biases:** `b_ih == b_hh` in the fit is expected. Both start at zero and
+    enter the gates only as a sum, so they get identical updates (the earlier
+    fits too). It has no effect on predictions.
+  - **Docs:** the README price-forecast section is rewritten with these numbers
+    and limits.
+
+  What changed in v3:
+  - First attempt (v2 below, retrained on the Mac, kept on branch
+    `wip/lstm-v2-attempt1`) failed acceptance: A1 1.0384, A2 47.1%, A3 2.137 vs
+    3.130 (pass). In 2026-08 alone its MSE was 3.849 vs 0.452 for the last
+    value.
+  - Diagnosis (`model_traning/diagnose_seam_channels.R`, pure-R forward on that
+    fit): the per-state minmax level channels were beyond their training range
+    at the 2026-07 origin. That was `price_mm` in 65% of states, and `ann_mm` in
+    71%, because the 2024 annual value exceeded every 2010-2023 value.
+    - Clipping both to the training range: seam median 0.999, 12% above own
+      maximum.
+    - `mom_z` and `rel12_z` were inside their training distribution, and
+      clipping them changed nothing.
+    - These are diagnostic interventions, not the fix.
+  - Fix, chosen from that evidence and not tuned on A1-A3: every price-type
+    input and the target become relative quantities.
+    - 7 channels: log price / trailing 12-month mean; month-over-month change;
+      season; log(annual EIA-861 value / mean monthly price over the 12 months
+      before its release); annual mask and age.
+    - The target is the per-horizon standardised log(P_{t+h} / P_t), served as
+      P_t * exp(mu + sd * y).
+    - Architecture, seed, `fit_as_of` and all windows are unchanged, and every
+      scaling is still fit on the training window only.
+  - The serving path dispatches on `fit$chan_names` and
+    `fit$transforms$target`. The shipped fit and the first-attempt fit serve
+    identically (checked to 0 difference). `check_feature_parity.R` also checks
+    the target transform: train vs serve 7e-15.
+  - `model_traning/smoke_train_without_torch.R` runs everything in
+    `train_price_lstm.R` except the torch training, using random weights. All
+    post-training steps ran on it.
+  - A random-weight network passes A1-A3 (1.003 / 0% / 2.876 < 3.130), because
+    with a log-ratio target it reproduces the drift baseline (last value x
+    exp(mean training log change), calibration MSE 2.868). The criteria stay
+    as fixed, but they cannot by themselves show that the network learned
+    anything. `fit$baselines` therefore now reports the drift baseline
+    (report only), and the retrained model's calibration MSE must be read
+    against it.
+
+* (Superseded by v3 above: this v2 retrain, attempt 1, failed acceptance
+  with A1 1.0384, A2 47.1%, A3 2.137 and was not shipped; its fit is kept on
+  branch `wip/lstm-v2-attempt1`.) Fix for the 2026-08 seam jump, prepared before
+  the retrain. `model_traning/diagnose_seam.R` showed the jump is not real: the true
+  Aug/Jul median is 0.9995 against 1.064 predicted, and in 2026-08 alone the LSTM
+  has an MSE of 3.36 vs 0.45 for the last value. It comes from two sparse
+  covariates that appear only at the end of the training history:
+  - The annual EIA-861 channel had data only for 2023-2025. With release dating
+    it first entered in 2024-10, so a training window held at most 4 such months,
+    against 22 at the 2026-07 origin.
+  - EIA-112 has only 2024. After 2024 it is carried forward, and its age reached
+    19 months at the 2026-07 origin; training never saw more than 1.
+
+  Changes:
+  - EIA-112 (c1) channels are removed from training. The annual channel is
+    backfilled to 2010 from the EIA-861 archives
+    (`data-raw/assemble_861_state_annual.R` ->
+    `inst/extdata/eia861_state_annual.csv.gz`; same definitions as the utility
+    slim, 2023-2025 identical). That leaves 8 channels.
+  - The serving path builds inputs from `fit$chan_names` and
+    `fit$transforms$ann_source`, so the shipped 11-channel fit is unchanged until
+    the retrain lands. `model_traning/check_feature_parity.R` checks that
+    training and serving build identical inputs (max difference 0).
+  - Architecture, seed, `fit_as_of` = 2026-07 and all three windows are
+    unchanged.
+
+  Acceptance criteria were fixed before the retrain and must not change after it
+  (`model_traning/accept_seam.R`):
+  - A1: the 2026-08 / 2026-07 median across states is in [0.99, 1.015].
+  - A2: at most 15% of states exceed their own 2015-2025 Aug/Jul maximum.
+  - A3: calibration-window MSE is below the last-value baseline.
+
+  The script also reports 2026-08 single-month MSE against last value and
+  seasonal ratio. It does not count toward the verdict, because 2026-08 was
+  already seen in the diagnosis.
+
 * The price LSTM is refit (same architecture: hidden 64, 36-month window,
   h = 1..5, 51 states pooled; `fit_as_of` still 2026-07):
   - Data: EIA-861M's state panel from 2010-01 in the current vintage
@@ -24,7 +152,7 @@
   |---|---|---|---|---|
   | previously shipped | 2.345 | +1.7, 2.6, 2.8, 4.1, 4.4% | 1.040 | 47% |
   | refit + correction | 2.274 | +3.2, 2.9, 1.1, 1.5, 2.8% | 1.040 | 61% |
-  | refit (shipped) | 2.224 | +0.9, 2.0, 1.5, 0.9, 0.3% | 1.064 | 82% |
+  | refit (shipped until the v3 retrain) | 2.224 | +0.9, 2.0, 1.5, 0.9, 0.3% | 1.064 | 82% |
 
   The jump into 2026-08 is still unexplained and is now larger (historical
   August/July median 1.0035); README documents it as a limitation.

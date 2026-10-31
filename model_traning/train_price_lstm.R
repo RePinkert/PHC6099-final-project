@@ -28,11 +28,11 @@ CALIB_FIRST <- "2026-02"  # 区间校准目标月起点
 
 cat("== data ==\n")
 P <- load_price_wide(".")
-ann <- load_ann_covariate(".")
-c1 <- load_c1_covariate(".")
+annrel <- ann_rel_covariate(P, ".")
 tf <- fit_transforms(P, MONTHS, TRAIN_LAST)
-feat <- build_price_features(P, ann, c1, tf)
+feat <- build_price_features(P, annrel, tf)
 arr <- feat$arr
+NCH <- dim(arr)[3]
 cat("price panel:", dim(P), " features:", dim(arr), "\n")
 
 im <- function(m) match(m, MONTHS)
@@ -45,10 +45,12 @@ j_end <- N_MONTHS
 ## 样本：origin j0 -> 输入 arr[, (j0-SEQ+1):j0, ]，目标 P[, j0+1:H]
 origins_train <- seq(SEQ, j_train_last - H)
 origins_val <- seq(j_val_first - 1, j_end - H)   # 2025-06 .. 2026-02，目标 2025-07..2026-07
+## 目标 = 标准化的 log(P_{t+h}/P_t)；均值/标准差只用训练样本
+tt <- fit_target_transform(P, origins_train, H)
 
 build_xy <- function(j0s) {
   n <- length(j0s) * 51L
-  X <- array(NA_real_, c(n, SEQ, 11))
+  X <- array(NA_real_, c(n, SEQ, NCH))
   Y <- matrix(NA_real_, n, H)
   st <- character(n); o <- integer(n)
   k <- 0L
@@ -56,7 +58,7 @@ build_xy <- function(j0s) {
     for (s in 1:51) {
       k <- k + 1L
       X[k, , ] <- arr[s, (j0 - SEQ + 1):j0, ]
-      Y[k, ] <- mm_price(P[s, (j0 + 1):(j0 + H)], tf$price_minmax[[s]])
+      Y[k, ] <- target_norm(P, s, j0, H, tt)
       st[k] <- STATES[s]; o[k] <- j0
     }
   }
@@ -111,7 +113,7 @@ lstm_model <- nn_module(
   }
 )
 
-model <- lstm_model(11L, HID, H)
+model <- lstm_model(NCH, HID, H)
 opt <- optim_adam(model$parameters, lr = LR, weight_decay = 1e-4)
 loss_fn <- nn_mse_loss()
 
@@ -171,19 +173,19 @@ trip <- data.frame(
   true_norm = as.vector(va$Y),
   stringsAsFactors = FALSE
 )
-trip$pred <- mapply(function(s, p) {
-  mm <- tf$price_minmax[[s]]; (p + 1) / 2 * (mm$max - mm$min) + mm$min
-}, trip$state, trip$pred_norm)
+p0 <- P[cbind(match(trip$state, STATES), trip$j0)]
+trip$pred <- target_denorm(trip$pred_norm, p0, list(mu = tt$mu[trip$h], sd = tt$sd[trip$h]))
 trip$pred_raw <- trip$pred
-trip$true <- mapply(function(s, p) {
-  mm <- tf$price_minmax[[s]]; (p + 1) / 2 * (mm$max - mm$min) + mm$min
-}, trip$state, trip$true_norm)
+trip$true <- P[cbind(match(trip$state, STATES), trip$target)]
 ## 基线：季节朴素（t+h-12）与末值（t）——须在子集切分前算好
 mm_raw <- P
 trip$seas <- mapply(function(s, j0, h) {
   mm_raw[s, if (j0 + h - 12 >= 1) j0 + h - 12 else j0]
 }, match(trip$state, STATES), trip$j0, trip$h)
 trip$last <- mapply(function(s, j0) mm_raw[s, j0], match(trip$state, STATES), trip$j0)
+## 漂移基线（只报告，不参与验收）：末值 x exp(训练期 h 步平均 log 变化)。目标是 log 比时，
+## 一个几乎没学到东西的网络也会输出接近它的值，所以 LSTM 要和它比才看得出学到了什么。
+trip$drift <- trip$last * exp(tt$mu[trip$h])
 
 ## 早停窗的视界偏差（相对残差中位数）只作诊断、不再校正点预测：
 ## 它与校准窗的偏差方向相反（h=1: -2.2% vs +0.9%），校正后校准窗 MSE 2.224 -> 2.274，
@@ -201,16 +203,19 @@ print(es_bias_diagnostic)
 
 mse <- function(a, b) mean((a - b)^2)
 diag <- data.frame(
-  model = c("lstm", "seasonal_naive", "last_value"),
+  model = c("lstm", "seasonal_naive", "last_value", "drift"),
   mse_es = c(mse(es_trips$true, es_trips$pred),
              mse(es_trips$true, es_trips$seas),
-             mse(es_trips$true, es_trips$last)),
+             mse(es_trips$true, es_trips$last),
+             mse(es_trips$true, es_trips$drift)),
   mse_cal = c(mse(cal_trips$true, cal_trips$pred),
               mse(cal_trips$true, cal_trips$seas),
-              mse(cal_trips$true, cal_trips$last)),
+              mse(cal_trips$true, cal_trips$last),
+              mse(cal_trips$true, cal_trips$drift)),
   mae_es = c(mean(abs(es_trips$true - es_trips$pred)),
              mean(abs(es_trips$true - es_trips$seas)),
-             mean(abs(es_trips$true - es_trips$last)))
+             mean(abs(es_trips$true - es_trips$last)),
+             mean(abs(es_trips$true - es_trips$drift)))
 )
 cat("== baselines ==\n"); print(diag)
 
@@ -240,12 +245,11 @@ print(rbind(calib = cov_cal, transfer = cov_transfer))
 ## ---- 2026-08..12 预测（origin 2026-07）----
 j0 <- N_MONTHS
 FC_MONTHS <- sprintf("%04d-%02d", 2026, 8:12)
-Xf <- array(NA_real_, c(51, SEQ, 11))
+Xf <- array(NA_real_, c(51, SEQ, NCH))
 for (s in 1:51) Xf[s, , ] <- arr[s, (j0 - SEQ + 1):j0, ]
 pf_norm <- as_array(with_no_grad(model(torch_tensor(Xf))))
 fc <- do.call(rbind, lapply(1:51, function(s) {
-  mm <- tf$price_minmax[[s]]
-  pr <- (pf_norm[s, ] + 1) / 2 * (mm$max - mm$min) + mm$min
+  pr <- target_denorm(pf_norm[s, ], P[s, j0], tt)
   data.frame(
     state = STATES[s], period = FC_MONTHS, h = 1:H,
     price = pr,
@@ -267,11 +271,14 @@ imp_cells <- if (any(imp)) {
 fit <- list(
   contract = paste0(
     "point = LSTM direct multi-horizon h=1..5, no bias correction (custom LSTMCell, ",
-    "candidate relu, hidden=64, seq_len=36, 51-state pooled; minmax per state + zscore fit ",
-    "on train window only); ",
+    "candidate relu, hidden=64, seq_len=36, 51-state pooled; target = per-h standardised ",
+    "log(P_{t+h}/P_t), served as P_t*exp(mu + sd*y); all inputs relative (no price level), ",
+    "zscore fit on train window only); ",
     "interval = per-horizon quantiles of relative residuals (true-pred)/pred from the ",
     "held-out calibration window 2026-02..2026-07 (cross-state scale-standardised, no obs_max ",
     "fallback); .sd = price*abs_q85/qnorm(0.925) keeps the downstream Gaussian-scale bridge; ",
+    "7 channels (log price / trailing 12-month mean, mom, season, log annual EIA-861 2010..2025 / ",
+    "trailing 12-month monthly mean at release, annual mask/age; no EIA-112), ",
     "annual EIA-861 Y value available from Y+1 October, Adjustment eiaid 99999 excluded; ",
     "early stopping on walk-forward valid 2025-07..2026-01, NOT on a test set"
   ),
@@ -281,14 +288,15 @@ fit <- list(
                         "(targets through ", TRAIN_LAST, ")"),
   valid_window = paste0("targets 2025-07..", ES_LAST, " (early stop)"),
   calib_window = paste0("targets ", CALIB_FIRST, "..2026-07 (interval quantiles)"),
-  seq_len = SEQ, n_hidden = HID, n_chan = 11L, h_max = H,
+  seq_len = SEQ, n_hidden = HID, n_chan = as.integer(NCH), h_max = H,
   chan_names = feat$chan,
   weights = list(
     w_ih = getm("cell.w_ih"), w_hh = getm("cell.w_hh"),
     b_ih = getm("cell.b_ih"), b_hh = getm("cell.b_hh"),
     w_out = getm("out.weight"), b_out = getm("out.bias")
   ),
-  transforms = list(price_minmax = tf$price_minmax, zpar = feat$zpar, ann_rng = feat$ann_rng),
+  transforms = list(zpar = feat$zpar, ann_source = ANN_SOURCE,
+                    target = list(type = tt$type, mu = unname(tt$mu), sd = unname(tt$sd))),
   es_bias_diagnostic = es_bias_diagnostic,
   intervals = iv,
   coverage = list(calib_in_sample = cov_cal, transfer_early_window = cov_transfer),

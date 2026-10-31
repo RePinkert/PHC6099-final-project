@@ -20,7 +20,7 @@ for (o in months[match("2025-06", months):match("2026-02", months)]) {
   j0 <- match(o, months)
   for (s in rownames(ph)) {
     w <- ns$.lstm_feature_window(s, o)
-    y <- ns$.lstm_denorm(ns$.lstm_forward_norm(array(w, c(1, dim(w))))[1, ], s)
+    y <- ns$.lstm_denorm(ns$.lstm_forward_norm(array(w, c(1, dim(w))))[1, ], s, o)
     for (h in seq_len(H)) {
       trip[[length(trip) + 1L]] <- data.frame(
         state = s, h = h, target = months[j0 + h], pred = y[h], true = ph[s, j0 + h],
@@ -64,7 +64,7 @@ cov_transfer <- sapply(seq_len(H), function(h) mean(abs(es_trips$rel[es_trips$h 
 states <- rownames(ph)
 fc <- do.call(rbind, lapply(states, function(s) {
   w <- ns$.lstm_feature_window(s, fit$fit_as_of)
-  pr <- ns$.lstm_denorm(ns$.lstm_forward_norm(array(w, c(1, dim(w))))[1, ], s)
+  pr <- ns$.lstm_denorm(ns$.lstm_forward_norm(array(w, c(1, dim(w))))[1, ], s, fit$fit_as_of)
   data.frame(state = s, period = sprintf("2026-%02d", 8:12), h = seq_len(H), price = pr,
              sd = pr * iv$abs_q85 / stats::qnorm(0.925),
              q_lo = pr * (1 + iv$r_q05), q_hi = pr * (1 + iv$r_q95), stringsAsFactors = FALSE)
