@@ -43,17 +43,18 @@
   }
 })
 
-## EIA-861 州年客户加权价（2023/24/25）：盖章 Y-01、向前填充；通道语义同训练侧
+## EIA-861 州年客户加权价：排除 Adjustment；Y 年值从 Y+1 年 10 月起可用
 .ann_wide <- function(months) {
   a <- utils::read.csv(system.file("extdata", "eia861_annual_slim.csv.gz", package = "lifewatt"),
                        stringsAsFactors = FALSE)
   sts <- dimnames(.price_history_wide())[[1]]
+  a <- a[a$eiaid != 99999 & is.finite(a$cus) & a$cus > 0, ]
   agg <- stats::aggregate(cbind(wsum = a$price * a$cus, cus = a$cus),
                           by = list(state = a$state, year = a$year), sum, na.rm = TRUE)
   V <- matrix(NA_real_, length(sts), length(months), dimnames = list(sts, months))
   for (i in seq_len(nrow(agg))) {
     si <- match(agg$state[i], sts)
-    stamp <- sprintf("%04d-01", agg$year[i])
+    stamp <- sprintf("%04d-10", agg$year[i] + 1L)
     if (!is.na(si) && stamp %in% months) V[si, match(stamp, months)] <- agg$wsum[i] / agg$cus[i]
   }
   .ffill_age(V)
@@ -205,7 +206,7 @@
   out <- lapply(unique(state), function(s) {
     w <- .lstm_feature_window(s, fit$fit_as_of)
     yn <- .lstm_forward_norm(array(w, c(1, dim(w)[1], dim(w)[2])))
-    pr_all <- .lstm_denorm(yn[1, ], s)
+    pr_all <- .lstm_denorm(yn[1, ], s) * (1 + fit$point_bias)
     k <- which(state == s)
     hh <- h[k]
     data.frame(
