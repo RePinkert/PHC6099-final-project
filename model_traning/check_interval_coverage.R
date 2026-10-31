@@ -42,6 +42,11 @@ rep_iv <- do.call(rbind, lapply(seq_len(H), function(h) {
 }))
 drift <- max(abs(as.matrix(rep_iv[, c("r_q05", "r_q95", "abs_q85")]) -
                  as.matrix(iv[, c("r_q05", "r_q95", "abs_q85")])))
+if (drift >= 1e-6) {
+  print(rep_iv)
+  print(iv[, c("h", "n", "r_q05", "r_q95", "abs_q85")])
+  cat(sprintf("quantile drift before assertion: %.9g\n", drift))
+}
 stopifnot(identical(as.integer(rep_iv$n), as.integer(iv$n)), drift < 1e-6)
 cat(sprintf("reproduction: n identical, max quantile drift %.1e\n\n", drift))
 
