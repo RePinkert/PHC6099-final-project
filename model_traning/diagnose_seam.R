@@ -18,11 +18,13 @@ M <- colnames(ph)
 S <- rownames(ph)
 O <- "2026-07"
 jo <- match(O, M)
+## 旧拟合（11 通道）含 EIA-112 c1；重训后（8 通道）没有，c1 相关的分析自动跳过
+has_c1 <- "c1_age" %in% fit$chan_names
 
 ## 只为提速：.lstm_feature_window 每次都重读年度/断供表，这里在本进程内缓存（结果不变）
-memo <- function(f) { force(f); cache <- list(); function(months) {
-  k <- paste(length(months), months[1], months[length(months)])
-  if (is.null(cache[[k]])) cache[[k]] <<- f(months)
+memo <- function(f) { force(f); cache <- list(); function(months, ...) {
+  k <- paste(length(months), months[1], months[length(months)], ...)
+  if (is.null(cache[[k]])) cache[[k]] <<- f(months, ...)
   cache[[k]]
 } }
 for (nm in c(".ann_wide", ".c1_wide")) {
@@ -70,7 +72,7 @@ per_state <- data.frame(state = S, obs_jul = obs_jul, pred_aug = base, true_aug 
 oor <- function(w) c(
   price_frac_gt1 = mean(abs(w[, 1]) > 1), price_max = max(w[, 1]), price_last = w[36, 1],
   ann_frac_gt1 = mean(abs(w[, 6]) > 1), ann_max = max(w[, 6]), ann_last = w[36, 6],
-  mom_absz_max = max(abs(w[, 2])), rel12_absz_max = max(abs(w[, 3])), c1_absz_max = max(abs(w[, 9])))
+  mom_absz_max = max(abs(w[, 2])), rel12_absz_max = max(abs(w[, 3])), c1_absz_max = if (has_c1) max(abs(w[, 9])) else NA_real_)
 oor_now <- t(sapply(win, oor))
 per_state <- cbind(per_state, oor_now)
 ## 对照：训练/早停期起点的同一指标（训练窗最后一个起点 2025-01、早停窗起点 2025-06）
@@ -107,6 +109,7 @@ res$pred_ratio_by_year <- tapply(bt$pred_ratio, bt$year, median)
 ## 年度通道在各起点最后一行的 mask=1 行数（训练窗内最多几行）
 res$ann_mask_rows <- sapply(c("2024-09", "2024-12", "2025-01", "2025-06", "2026-07"),
                             function(o) sum(ns$.lstm_feature_window("FL", o)[, 7]))
+if (has_c1) {
 win_2501 <- lapply(S, function(s) ns$.lstm_feature_window(s, "2025-01")); names(win_2501) <- S
 ## 训练起点上见过的最大 age（只看有数据的行；无数据行的 age 是哨兵值 60/60）
 c1_age_train_max <- max(vapply(win_2501, function(w) max(w[w[, 10] == 1, 11]), numeric(1)))
@@ -116,6 +119,7 @@ bt$c1_age_months <- vapply(bt$origin, function(o) ns$.lstm_feature_window("FL", 
 res$excess_vs_c1_age <- bt[bt$origin >= "2024-01", c("origin", "c1_age_months", "pred_ratio", "true_ratio", "excess")]
 res$cor_excess_c1_age_2024on <- with(bt[bt$origin >= "2024-01" & is.finite(bt$excess), ],
                                      cor(excess, c1_age_months, method = "spearman"))
+}
 pz <- fit$transforms$zpar
 mm_of <- function(s) fit$transforms$price_minmax[[s]]
 set_last_price <- function(w, s, p_new) {  # 只改最后一行的价格及其衍生通道（mom、rel12 只依赖到当月）
@@ -160,6 +164,7 @@ abl <- list(
   c1_age_cap_and_price_clip = function(w, s) {
     k <- w[, 10] == 1; w[k, 11] <- pmin(w[k, 11], c1_age_train_max); w[, 1] <- pmin(pmax(w[, 1], -1), 1); w }
 )
+if (!has_c1) abl <- abl[!grepl("c1", names(abl))]
 res$ablation <- t(sapply(abl, function(f) {
   p1 <- fwd(lapply(S, function(s) f(win[[s]], s)), S)[, 1]
   r <- p1 / obs_jul
@@ -172,7 +177,8 @@ op <- options(digits = 4)
 for (nm in names(res)) { cat("\n==", nm, "==\n"); print(res[[nm]]) }
 options(op)
 
-## ---- 4b. 同一截断用于 2024-01 以来每个起点：超额跳幅的时间趋势是否消失 ----
+## ---- 4b. 同一截断用于 2024-01 以来每个起点：超额跳幅的时间趋势是否消失（仅旧拟合）----
+if (has_c1) {
 fix_w <- function(w) { k <- w[, 10] == 1; w[k, 11] <- pmin(w[k, 11], c1_age_train_max)
   w[, 1] <- pmin(pmax(w[, 1], -1), 1); w }
 cap_age <- function(w) { k <- w[, 10] == 1; w[k, 11] <- pmin(w[k, 11], c1_age_train_max); w }
@@ -194,3 +200,4 @@ utils::write.csv(bt2, file.path(out_dir, "seam_backtest_capped.csv"), row.names 
 saveRDS(res, file.path(out_dir, "seam_diagnosis.rds"))
 cat("\n== backtest_capped (mean |excess|) ==\n"); print(res$backtest_capped, digits = 3)
 cat("\n== backtest_capped (median excess) ==\n"); print(res$backtest_capped_median, digits = 3)
+}
