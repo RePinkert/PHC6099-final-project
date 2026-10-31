@@ -115,7 +115,7 @@ test_that("frozen calibration quantiles reproduce from the shipped weights and d
     j0 <- match(o, months)
     for (s in rownames(ph)) {
       w <- ns$.lstm_feature_window(s, o)
-      y <- ns$.lstm_denorm(ns$.lstm_forward_norm(array(w, c(1, dim(w))))[1, ], s)
+      y <- ns$.lstm_denorm(ns$.lstm_forward_norm(array(w, c(1, dim(w))))[1, ], s) * (1 + fit$point_bias)
       for (h in seq_len(fit$h_max)) {
         if (j0 + h <= length(months) && months[j0 + h] >= "2026-02") {
           rel[[length(rel) + 1L]] <- c(h = h, r = (ph[s, j0 + h] - y[h]) / y[h])
