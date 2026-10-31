@@ -20,6 +20,10 @@ O <- "2026-07"
 jo <- match(O, M)
 ## 旧拟合（11 通道）含 EIA-112 c1；重训后（8 通道）没有，c1 相关的分析自动跳过
 has_c1 <- "c1_age" %in% fit$chan_names
+## 第 2、4 节按列号取通道（1 = price_mm，6..8 = 年度），只对 v2 及以前的通道排列有意义；
+## v3（全部相对量）请用按通道名定位的 diagnose_seam_channels.R
+legacy <- identical(fit$chan_names[1:8], c("price_mm", "mom_z", "rel12_z", "sin12", "cos12",
+                                           "ann_mm", "ann_mask", "ann_age"))
 
 ## 只为提速：.lstm_feature_window 每次都重读年度/断供表，这里在本进程内缓存（结果不变）
 memo <- function(f) { force(f); cache <- list(); function(months, ...) {
@@ -31,11 +35,11 @@ for (nm in c(".ann_wide", ".c1_wide")) {
   unlockBinding(nm, ns); assign(nm, memo(get(nm, ns)), envir = ns); lockBinding(nm, ns)
 }
 
-fwd <- function(ws, states) {  # ws: list of 36x11 windows -> denormalised h=1..5 matrix
+fwd <- function(ws, states, origin = O) {  # ws: list of 36 x n_chan windows -> denormalised h=1..5
   X <- array(NA_real_, c(length(ws), dim(ws[[1]])))
   for (i in seq_along(ws)) X[i, , ] <- ws[[i]]
   yn <- ns$.lstm_forward_norm(X)
-  t(vapply(seq_along(states), function(i) ns$.lstm_denorm(yn[i, ], states[i]), numeric(fit$h_max)))
+  t(vapply(seq_along(states), function(i) ns$.lstm_denorm(yn[i, ], states[i], origin), numeric(fit$h_max)))
 }
 win <- lapply(S, function(s) ns$.lstm_feature_window(s, O))
 names(win) <- S
@@ -68,6 +72,7 @@ res$truth_extra <- c(
 per_state <- data.frame(state = S, obs_jul = obs_jul, pred_aug = base, true_aug = true_aug,
                         pred_ratio = jump, true_ratio = true_r, hist_max = hist_max)
 
+if (legacy) {
 ## ---- 2. 归一化越界（起点 2026-07 的输入窗）----
 oor <- function(w) c(
   price_frac_gt1 = mean(abs(w[, 1]) > 1), price_max = max(w[, 1]), price_last = w[36, 1],
@@ -87,11 +92,12 @@ res$oor_cor <- sapply(c("price_last", "price_frac_gt1", "ann_last", "ann_frac_gt
 res$oor_cor_jump <- sapply(c("price_last", "price_frac_gt1", "ann_last", "ann_frac_gt1", "rel12_absz_max"),
                            function(v) cor(per_state[[v]], jump, method = "spearman"))
 
+}
 ## ---- 3. 回测 ----
 origins <- M[match("2012-12", M):jo]
 bt <- do.call(rbind, lapply(origins, function(o) {
   j <- match(o, M)
-  p1 <- fwd(lapply(S, function(s) ns$.lstm_feature_window(s, o)), S)[, 1]
+  p1 <- fwd(lapply(S, function(s) ns$.lstm_feature_window(s, o)), S, o)[, 1]
   data.frame(origin = o, pred_ratio = median(p1 / ph[, j]),
              true_ratio = if (j < length(M)) median(ph[, j + 1] / ph[, j]) else NA_real_,
              excess = if (j < length(M)) median(p1 / ph[, j] - ph[, j + 1] / ph[, j]) else NA_real_,
@@ -105,6 +111,7 @@ bt$year <- substr(bt$origin, 1, 4)
 res$excess_by_year <- tapply(bt$excess, bt$year, median, na.rm = TRUE)
 res$pred_ratio_by_year <- tapply(bt$pred_ratio, bt$year, median)
 
+if (legacy) {
 ## ---- 4. 消融（起点 2026-07，分母固定为 2026-07 观测值）----
 ## 年度通道在各起点最后一行的 mask=1 行数（训练窗内最多几行）
 res$ann_mask_rows <- sapply(c("2024-09", "2024-12", "2025-01", "2025-06", "2026-07"),
@@ -170,6 +177,7 @@ res$ablation <- t(sapply(abl, function(f) {
   r <- p1 / obs_jul
   c(summ(r), median_err_vs_true = median(r - true_r), mse_vs_true_aug = mean((p1 - true_aug)^2))
 }))
+} else cat("(sections 2 and 4 skip: they index legacy channel positions; use diagnose_seam_channels.R)\n")
 
 utils::write.csv(per_state, file.path(out_dir, "seam_per_state.csv"), row.names = FALSE)
 saveRDS(res, file.path(out_dir, "seam_diagnosis.rds"))
@@ -186,8 +194,8 @@ bt2 <- do.call(rbind, lapply(M[match("2024-01", M):jo], function(o) {
   j <- match(o, M)
   ws <- lapply(S, function(s) ns$.lstm_feature_window(s, o))
   tr1 <- if (o == O) true_aug else ph[, j + 1]
-  r0 <- fwd(ws, S)[, 1] / ph[, j]; r1 <- fwd(lapply(ws, cap_age), S)[, 1] / ph[, j]
-  r2 <- fwd(lapply(ws, fix_w), S)[, 1] / ph[, j]; rt <- tr1 / ph[, j]
+  r0 <- fwd(ws, S, o)[, 1] / ph[, j]; r1 <- fwd(lapply(ws, cap_age), S, o)[, 1] / ph[, j]
+  r2 <- fwd(lapply(ws, fix_w), S, o)[, 1] / ph[, j]; rt <- tr1 / ph[, j]
   data.frame(origin = o, excess_shipped = median(r0 - rt), excess_age_cap = median(r1 - rt),
              excess_age_cap_price_clip = median(r2 - rt))
 }))
