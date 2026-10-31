@@ -35,7 +35,9 @@ test_that("predicted regime, bill+usage: posterior equals inverse-variance blend
 test_that("observed regime, bill+usage: local measurement alongside measured state price", {
   r <- expected_life_loss("32601", "2026-07", bill = 150, usage = 1000)
   expect_equal(r$evidence_regime, "measured_local")
-  expect_equal(r$price_posterior, 150 * 100 / 1000)
+  expect_equal(r$price_meas, 150 * 100 / 1000)
+  expect_true(is.na(r$price_posterior))  # nothing to blend with: no posterior is claimed
+  expect_true(is.na(r$price_posterior_sd))
   expect_true(is.na(r$price_sd))  # observed has no prior sd
 })
 
@@ -66,4 +68,13 @@ test_that("honest errors", {
   expect_error(expected_life_loss("32601", "2026-07", bill = 100, usage = -1), "usage must be", fixed = TRUE)
   expect_error(expected_life_loss("32601", "2026-07", delta_le = NA_real_), "finite", fixed = TRUE)
   expect_error(expected_life_loss("32601", "2026-07", meas_sd = 0), "meas_sd must be a positive number", fixed = TRUE)
+})
+
+test_that("implausible bill / usage combinations are refused, not turned into evidence", {
+  expect_error(expected_life_loss("32601", "2026-08", bill = 5000, usage = 1),
+               "outside the plausible 1..150 range", fixed = TRUE)
+  expect_error(my_electricity("32601", bill = 1, usage = 5000, time = "2026-08"),
+               "outside the plausible 1..150 range", fixed = TRUE)
+  r <- expected_life_loss("32601", "2026-08", bill = 180, usage = 1200)
+  expect_equal(r$price_meas, 15)
 })

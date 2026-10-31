@@ -32,7 +32,7 @@ library(lifewatt)
 # observed price (ZIP-level annual, customer-weighted)
 electricity_price("32601", year = 2024)
 
-# state monthly series (2023-01 .. 2026-07; 2025+ provisional flags)
+# state monthly series (2023-01 .. 2026-07; EIA-preliminary months flagged)
 electricity_price("32601", period = "mom")
 
 # trends
@@ -59,8 +59,8 @@ health_measure("32601", measure = c("DIABETES", "BPHIGH"))
 Every returned row carries provenance columns (`source`, `level`,
 `degraded_from`, `mapping_vintage`, `provisional`). Prices are state-level
 estimates for the utility territory the OpenEI 2024 mapping assigns to the ZIP.
-Months from 2025-01 onward are provisional and flagged; months after 2026-07
-are served by a validated phase-B triplet forecast (`fit_as_of = 2026-07`).
+Months EIA still marks Preliminary are flagged provisional; months after 2026-07
+are served by the LSTM price forecast (`fit_as_of = 2026-07`).
 `health_measure()` is the exception on provenance *epochs* rather than on
 columns: it is the only interface that is not served from a shipped snapshot, so
 its `provisional` flag is always `FALSE` while the bytes come from a live

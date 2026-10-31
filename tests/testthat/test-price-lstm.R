@@ -81,14 +81,58 @@ test_that("lstm fit contract ledger is intact", {
                     fit$forecast$price < fit$forecast$q_hi))
   ## 85% 区间覆盖率台账在验收带 [0.85, 0.95]（校准口径）
   expect_true(all(fit$coverage$calib_in_sample >= 0.80))
-  ## 残差右偏必须可见（q95 > |q05|），不做对称化
-  expect_true(all(fit$intervals$r_q95 > abs(fit$intervals$r_q05)))
+  ## 区间直接取残差的 5%/95% 分位，不做对称化（偏斜方向随 h 变化：h=1..4 右偏，h=5 左偏）
+  expect_true(all(abs(fit$intervals$r_q95 + fit$intervals$r_q05) > 1e-6))
+  ## 去掉偏差校正后不再携带 point_bias；早停窗偏差只作诊断
+  expect_null(fit$point_bias)
+  expect_length(fit$es_bias_diagnostic, fit$h_max)
 })
 
 test_that("package prediction path carries no torch dependency", {
   p <- system.file("DESCRIPTION", package = "lifewatt")
   desc <- if (nzchar(p)) readLines(p) else readLines(test_path("..", "..", "DESCRIPTION"))
   expect_false(any(grepl("torch", desc)))
-  ns <- readLines(test_path("..", "..", "NAMESPACE"))
-  expect_false(any(grepl("torch", ns)))
+  # 安装态（R CMD check）没有 ../../NAMESPACE；用运行时已加载的导入表，两种模式都成立
+  expect_false("torch" %in% names(getNamespaceImports("lifewatt")))
+  lifewatt:::.lstm_predict("FL", "2026-12")
+  expect_false("torch" %in% loadedNamespaces())
+})
+
+test_that(".sd is the Gaussian scale implied by the 85% absolute-residual quantile", {
+  iv <- lifewatt:::.price_lstm_fit()$intervals
+  p <- lifewatt:::.lstm_predict(rep("FL", 5), sprintf("2026-%02d", 8:12))
+  # P(|e| <= abs_q85) = 0.85 under N(0, sd) => abs_q85 = sd * qnorm(0.925)
+  expect_equal(p$.sd, p$price * iv$abs_q85[p$h] / qnorm(0.925), tolerance = 1e-12)
+  z <- iv$abs_q85[p$h] * p$price / p$.sd
+  expect_equal(2 * pnorm(z) - 1, rep(0.85, 5), tolerance = 1e-12)
+})
+
+test_that("frozen calibration quantiles reproduce from the shipped weights and data", {
+  skip_on_cran()  # ~25 s: 459 forward passes (origins 2025-06..2026-02 x 51 states)
+  ns <- asNamespace("lifewatt")
+  fit <- ns$.price_lstm_fit()
+  ph <- ns$.price_history_wide()
+  months <- colnames(ph)
+  rel <- list()
+  for (o in months[match("2025-06", months):match("2026-02", months)]) {
+    j0 <- match(o, months)
+    for (s in rownames(ph)) {
+      w <- ns$.lstm_feature_window(s, o)
+      y <- ns$.lstm_denorm(ns$.lstm_forward_norm(array(w, c(1, dim(w))))[1, ], s)
+      for (h in seq_len(fit$h_max)) {
+        if (j0 + h <= length(months) && months[j0 + h] >= "2026-02") {
+          rel[[length(rel) + 1L]] <- c(h = h, r = (ph[s, j0 + h] - y[h]) / y[h])
+        }
+      }
+    }
+  }
+  rel <- as.data.frame(do.call(rbind, rel))
+  q <- function(x, p) unname(stats::quantile(x, p))
+  for (h in seq_len(fit$h_max)) {
+    r <- rel$r[rel$h == h]
+    expect_equal(length(r), fit$intervals$n[h])
+    expect_equal(q(r, 0.05), fit$intervals$r_q05[h], tolerance = 1e-6)
+    expect_equal(q(r, 0.95), fit$intervals$r_q95[h], tolerance = 1e-6)
+    expect_equal(q(abs(r), 0.85), fit$intervals$abs_q85[h], tolerance = 1e-6)
+  }
 })

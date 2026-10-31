@@ -1,6 +1,6 @@
 # prepare.R —— model_traning 分支：LSTM 训练数据装配（价格面板 + 异频协变量通道）
 # 数据源（全部树内、离线可复现）：
-#   data-raw/eia_json/*.json           州级住宅月度电价 2001-01..2026-07（307 月 x 51 州）
+#   inst/extdata/price_history_slim.csv.gz  EIA-861M 州级住宅月度电价 2010-01..2026-07
 #   inst/extdata/eia861_annual_slim.csv.gz    EIA-861 州年客户加权价（2023/2024/2025）
 #   inst/extdata/eia112_state_month_slim.csv.gz   EIA-112 断供机制（仅 2024-01..12）
 #   inst/extdata/vsrr_state_quarter_slim.csv.gz   VSRR 州季死亡率（2023Q1..2025Q3）
@@ -10,26 +10,19 @@
 # 陈旧源的可信度由模型自learn，不靠人工对齐。
 
 # 运行方式：在包根目录下 Rscript model_traning/<script>.R（root = "."）
-stopifnot(requireNamespace("jsonlite", quietly = TRUE))
-
-MONTHS <- sprintf("%04d-%02d", rep(2001:2026, each = 12), rep(1:12, 26))
+MONTHS <- sprintf("%04d-%02d", rep(2010:2026, each = 12), rep(1:12, 17))
 MONTHS <- MONTHS[MONTHS <= "2026-07"]
 N_MONTHS <- length(MONTHS)
 
 STATES <- c(state.abb, "DC")
 
 load_price_wide <- function(root = ".") {
-  files <- file.path(root, "data-raw", "eia_json", paste0(STATES, ".json"))
-  stopifnot(all(file.exists(files)))
+  d <- utils::read.csv(file.path(root, "inst", "extdata", "price_history_slim.csv.gz"),
+                       stringsAsFactors = FALSE)
   P <- matrix(NA_real_, nrow = length(STATES), ncol = N_MONTHS,
               dimnames = list(STATES, MONTHS))
-  for (i in seq_along(files)) {
-    j <- jsonlite::fromJSON(files[i], simplifyVector = TRUE)
-    d <- j$response$data
-    idx <- match(d$period, MONTHS)
-    ok <- !is.na(idx) & !is.na(suppressWarnings(as.numeric(d$price)))
-    P[i, idx[ok]] <- suppressWarnings(as.numeric(d$price))[ok]
-  }
+  ok <- d$state %in% STATES & d$period %in% MONTHS & is.finite(d$price)
+  P[cbind(match(d$state[ok], STATES), match(d$period[ok], MONTHS))] <- d$price[ok]
   ## 短缺口（内部 <=3 月）线性插补并留痕；长缺口/端点缺口拒绝
   imputed <- matrix(FALSE, nrow(P), N_MONTHS, dimnames = dimnames(P))
   for (i in seq_len(nrow(P))) {
@@ -53,17 +46,18 @@ load_price_wide <- function(root = ".") {
   P
 }
 
-## EIA-861 州年客户加权价（2023/24/25），盖章于 Y-01 并向前填充；2023 前 mask=0
+## EIA-861 州年客户加权价：排除 Adjustment 伪 utility；Y 年终值按 Y+1 年 10 月发布
 load_ann_covariate <- function(root = ".") {
   a <- utils::read.csv(file.path(root, "inst", "extdata", "eia861_annual_slim.csv.gz"),
                        stringsAsFactors = FALSE)
-  agg <- aggregate(cbind(rev = a$rev * 0 + a$price * a$cus, cus = a$cus),
+  a <- a[a$eiaid != 99999 & is.finite(a$cus) & a$cus > 0, ]
+  agg <- aggregate(cbind(rev = a$price * a$cus, cus = a$cus),
                    by = list(state = a$state, year = a$year), sum, na.rm = TRUE)
   agg$price_w <- agg$rev / agg$cus
   V <- matrix(NA_real_, length(STATES), N_MONTHS, dimnames = list(STATES, MONTHS))
   for (i in seq_len(nrow(agg))) {
     si <- match(agg$state[i], STATES)
-    stamp <- sprintf("%04d-01", agg$year[i])
+    stamp <- sprintf("%04d-10", agg$year[i] + 1L)
     if (!is.na(si) && stamp %in% MONTHS) V[si, match(stamp, MONTHS)] <- agg$price_w[i]
   }
   ff <- t(apply(V, 1, function(x) {
@@ -172,7 +166,8 @@ build_price_features <- function(P, ann, c1, transforms) {
   ann_rng <- matrix(NA_real_, 51, 2, dimnames = list(STATES, NULL))
   for (i in 1:51) {
     mm[i, ] <- mm_price(P[i, ], transforms$price_minmax[[i]])
-    av <- ann$value[i, ]; am <- av[ann$mask[i, ] == 1]
+    av <- ann$value[i, ]
+    am <- av[ann$mask[i, ] == 1 & MONTHS <= transforms$train_last]
     rng <- if (length(am)) range(am) else c(0, 1)
     if (diff(rng) == 0) rng <- rng + c(-0.5, 0.5)
     ann_rng[i, ] <- rng

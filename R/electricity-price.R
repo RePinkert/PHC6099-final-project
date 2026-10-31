@@ -1,7 +1,7 @@
 # electricity_price() —— ZIP 级电价 accessor（实装自 exp#37；本文件只放本函数，
 # electricity_price_trend() 独立成 R/electricity-price-trend.R 以便按函数分片落地）。
 # mock 意向：expected_life_loss/my_electricity 是正门，这里保持可用的探索性 accessor。
-# 年度 = A1×A2（客户数加权，zip 级 2023/2024/2025）；mom = B1 州级月频序列（2023-01→2026-07，2025-01 起 provisional）。
+# 年度 = A1×A2（客户数加权，zip 级 2023/2024/2025）；mom = B1 州级月频序列（2023-01→2026-07，provisional = EIA 标 Preliminary 的月份）。
 
 .mom_series <- function(zip) {
   zs <- .zip_state(zip)
@@ -24,7 +24,7 @@
     unit = "cents/kWh",
     price_sd = rep(NA_real_, n),
     regime = rep("observed", n),
-    provisional = rows$period >= "2025-01",
+    provisional = rows$data_status == "Preliminary",
     fit_as_of = rep(NA_character_, n),
     source = rep("EIA retail-sales monthly (B1; inst/extdata cache)", n),
     level = rep("state", n),
@@ -46,7 +46,7 @@
 #' ZIP, weighted by each utility's 2020 population share inside the ZIP (census blocks
 #' x HIFLD service territories); ZIPs without a share fall back to system-wide
 #' residential customers, and `weight_basis` says which applied. The monthly series is the B1 state-level
-#' retail-sales cache (2023-01 to 2026-07); months from 2025-01 onward are provisional
+#' retail-sales cache (2023-01 to 2026-07); months EIA marks Preliminary are provisional
 #' and flagged.
 #'
 #' @param zip A character or numeric US ZIP code.

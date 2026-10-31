@@ -1,50 +1,43 @@
-# assemble_price_history_slim.R —— 价格 LSTM 特征所需的历史电价面（2020-01..2026-07）
-# 来源：data-raw/eia_json/*.json（EIA API 住宅月度价，51 州，2001-01 起）
-# 产物：inst/extdata/price_history_slim.csv.gz (state, period, price, imputed)
-# 用途：仅供 R/price-lstm.R 特征构造（观测供给契约不变：served observed = 2023-01..2026-07
-#       的 b1_monthly_cache）；声明窗口 2023-01..2026-12 不因此扩展。
-# imputed=1 为源缺口线性插补格（训练侧 prepare.R 同口径）。
+# assemble_price_history_slim.R —— 价格 LSTM 特征所需的历史电价面（2010-01..2026-07）
+# 来源：EIA-861M bulk workbook, Monthly-States sheet（无需 API key）
+#   https://www.eia.gov/electricity/data/eia861m/xls/sales_revenue.xlsx
+# 第 4 列为 Data Status，第 8 列为住宅电价（cents/kWh）。即使源文件已有
+# 2026-08，仍按冻结预测契约截在 fit_as_of = 2026-07。
+# 产物：inst/extdata/price_history_slim.csv.gz
 
+stopifnot(requireNamespace("readxl", quietly = TRUE))
+
+url <- "https://www.eia.gov/electricity/data/eia861m/xls/sales_revenue.xlsx"
+xlsx <- tempfile(fileext = ".xlsx")
+on.exit(unlink(xlsx), add = TRUE)
+utils::download.file(url, xlsx, mode = "wb", quiet = TRUE)
+
+raw <- suppressMessages(readxl::read_excel(
+  xlsx, sheet = "Monthly-States", skip = 3, col_names = FALSE,
+  col_types = rep("text", 24)
+))
 states <- c(state.abb, "DC")
-months <- sprintf("%04d-%02d", rep(2001:2026, each = 12), rep(1:12, 26))
-months <- months[months <= "2026-07"]
-
-P <- matrix(NA_real_, length(states), length(months), dimnames = list(states, months))
-for (i in seq_along(states)) {
-  j <- jsonlite::fromJSON(file.path("data-raw", "eia_json", paste0(states[i], ".json")))
-  d <- j$response$data
-  idx <- match(d$period, months)
-  pv <- suppressWarnings(as.numeric(d$price))
-  ok <- !is.na(idx) & is.finite(pv)
-  P[i, idx[ok]] <- pv[ok]
-}
-
-imputed <- matrix(FALSE, nrow(P), ncol(P), dimnames = dimnames(P))
-for (i in seq_len(nrow(P))) {
-  x <- P[i, ]
-  if (all(is.finite(x))) next
-  na <- which(!is.finite(x))
-  fin <- which(is.finite(x))
-  runs <- split(na, cumsum(c(1, diff(na) != 1)))
-  for (r in runs) {
-    if (length(r) > 3 || min(r) < min(fin) || max(r) > max(fin)) {
-      stop(sprintf("unfillable price gap for %s at %s", states[i], paste(months[r], collapse = ",")))
-    }
-    x[r] <- stats::approx(fin, x[fin], xout = r)$y
-    imputed[i, r] <- TRUE
-  }
-  P[i, ] <- x
-}
-stopifnot(all(is.finite(P)))
-
-keep <- months >= "2020-01"
 out <- data.frame(
-  state = rep(states, each = sum(keep)),
-  period = rep(months[keep], times = length(states)),
-  price = as.numeric(t(P[, keep])),
-  imputed = as.integer(t(imputed[, keep])),
+  state = raw[[3]],
+  period = sprintf("%04d-%02d", as.integer(raw[[1]]), as.integer(raw[[2]])),
+  price = suppressWarnings(as.numeric(raw[[8]])),
+  data_status = raw[[4]],
   stringsAsFactors = FALSE
 )
+out <- out[out$state %in% states & out$period >= "2010-01" &
+             out$period <= "2026-07" & is.finite(out$price), ]
+out <- out[order(match(out$state, states), out$period), ]
+stopifnot(!anyDuplicated(out[c("state", "period")]))
+
+months <- sprintf("%04d-%02d", rep(2010:2026, each = 12), rep(1:12, 17))
+months <- months[months <= "2026-07"]
+expected <- expand.grid(state = states, period = months, stringsAsFactors = FALSE)
+stopifnot(nrow(out) == nrow(expected),
+          setequal(paste(out$state, out$period), paste(expected$state, expected$period)))
+out$imputed <- 0L
+out <- out[c("state", "period", "price", "imputed", "data_status")]
+
 utils::write.csv(out, gzfile("inst/extdata/price_history_slim.csv.gz"), row.names = FALSE)
-cat("wrote inst/extdata/price_history_slim.csv.gz:", nrow(out), "rows",
-    sum(out$imputed), "imputed cells\n")
+cat("wrote inst/extdata/price_history_slim.csv.gz:", nrow(out), "rows;",
+    min(out$period), "through", max(out$period), "; statuses:",
+    paste(names(table(out$data_status)), table(out$data_status), collapse = ", "), "\n")
