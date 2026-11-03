@@ -23,6 +23,7 @@
 # 运行：Rscript model_traning/conf_train_folds_serving.R
 
 source("model_traning/prepare.R")
+source("model_traning/ann_rel_variants.R")
 source("R/conf-protocol.R")
 source("R/conf-intervals.R")
 suppressMessages(library(torch))
@@ -30,8 +31,26 @@ suppressMessages(library(torch))
 SEQ <- 36L; H <- 5L; HID <- 64L
 LR <- 1e-3; BATCH <- 512L; MAX_EPOCHS <- 240L; PATIENCE <- 60L
 NOMINAL <- CONF_NOMINAL
-EVAL_YEARS <- 2026L
-CRITS <- c("mse", "wis")
+
+## ---- 可调参数（环境变量；默认值 = 已发布的那次训练）----
+## SERVING_ANN    年值协变量口径：filed | panel_mean | panel_mean_early | workbook_revsal
+## SERVING_CRIT   早停准则（逗号分隔）：mse | wis
+## SERVING_STOP   早停方式：patience | fixed（fixed = 固定训练 N 个 epoch，把"准则"与"停在哪"解耦）
+## SERVING_PATIENCE / SERVING_EPOCHS
+## SERVING_FOLDS  评估年（逗号分隔）：2026 | 2027
+## SERVING_TAG    文件名后缀（留空 = 与已发布的候选文件同名）
+ANN_VARIANT <- Sys.getenv("SERVING_ANN", "filed")
+CRITS <- strsplit(Sys.getenv("SERVING_CRIT", "mse,wis"), ",", fixed = TRUE)[[1]]
+STOP_MODE <- Sys.getenv("SERVING_STOP", "patience")
+PATIENCE <- as.integer(Sys.getenv("SERVING_PATIENCE", "60"))
+FIXED_EPOCHS <- as.integer(Sys.getenv("SERVING_EPOCHS", "90"))
+MIN_EPOCH <- as.integer(Sys.getenv("SERVING_MIN_EPOCH", "0"))
+EVAL_YEARS <- as.integer(strsplit(Sys.getenv("SERVING_FOLDS", "2026"), ",", fixed = TRUE)[[1]])
+TAG <- Sys.getenv("SERVING_TAG", "")
+SEED_BASE <- as.integer(Sys.getenv("SERVING_SEED", "20261103"))
+cat(sprintf("== serving fits: ann=%s crit=%s stop=%s patience=%d fixed_epochs=%d min_epoch=%d folds=%s tag=%s seed_base=%d ==\n",
+            ANN_VARIANT, paste(CRITS, collapse = "/"), STOP_MODE, PATIENCE, FIXED_EPOCHS, MIN_EPOCH,
+            paste(EVAL_YEARS, collapse = "/"), TAG, SEED_BASE))
 
 ## 折定义（服务 regime：留出 12 个月，评估 origin 距最后一个训练 origin 18 个月）
 conf_fold <- function(y) {
@@ -44,7 +63,6 @@ conf_fold <- function(y) {
 }
 
 P <- load_price_wide(".")
-annrel <- ann_rel_covariate(P, ".")
 im <- function(m) match(m, MONTHS)
 
 lstm_cell <- nn_module(
@@ -85,6 +103,7 @@ lstm_model <- nn_module(
 conf_train_one <- function(fold, crit = "mse", seed = 20261103L) {
   set.seed(seed); torch_manual_seed(seed)
   tf <- fit_transforms(P, MONTHS, fold$train_last)
+  annrel <- ann_rel_variant(P, ".", variant = ANN_VARIANT)
   feat <- build_price_features(P, annrel, tf)
   arr <- feat$arr; NCH <- dim(arr)[3]
   j_fit_last <- im(fold$train_last); j_es_first <- im(fold$es_first); j_es_last <- im(fold$es_last)
@@ -158,13 +177,23 @@ conf_train_one <- function(fold, crit = "mse", seed = 20261103L) {
     if (epoch %% 20 == 0) cat(sprintf("   epoch %3d es_mse %.4f es_wis %.4f es_cov %.3f\n",
                                       epoch, ev$mse, ev$wis, ev$cov))
     sc <- score_of(ev)
-    if (is.finite(sc) && sc < best$score - 1e-9) {
+    ## 早停下限：早于 MIN_EPOCH 的 epoch 不参与"选权重"（fold 2025 的 wis 准则停在 epoch 3，
+    ## 那次"更稳"是**没训练**的副产品，不是置信度目标的功劳）
+    eligible <- epoch >= MIN_EPOCH
+    if (eligible && is.finite(sc) && sc < best$score - 1e-9) {
       best <- list(score = sc, epoch = epoch,
                    state = lapply(model$state_dict(), function(x) x$detach()$clone()))
       wait <- 0L
-    } else {
+    } else if (eligible) {
       wait <- wait + 1L
-      if (wait >= PATIENCE) { cat("   early stop at epoch", epoch, "\n"); break }
+      if (STOP_MODE == "patience" && wait >= PATIENCE) {
+        cat("   early stop at epoch", epoch, "\n"); break
+      }
+    }
+    if (STOP_MODE == "fixed" && epoch >= FIXED_EPOCHS) {
+      best <- list(score = sc, epoch = epoch,
+                   state = lapply(model$state_dict(), function(x) x$detach()$clone()))
+      cat("   fixed budget reached at epoch", epoch, "\n"); break
     }
   }
   model$load_state_dict(best$state); model$eval()
@@ -172,7 +201,9 @@ conf_train_one <- function(fold, crit = "mse", seed = 20261103L) {
   fit <- list(
     contract = paste0("rolling-origin candidate (confidence-objective experiment, NOT shipped). ",
                       "fold eval year ", fold$eval_year, "; early-stop criterion ", crit,
-                      "; best epoch ", best$epoch, "; score ", round(best$score, 5), ". ",
+                      "; best epoch ", best$epoch, "; score ", round(best$score, 5),
+                      "; stop mode ", STOP_MODE, "; min epoch ", MIN_EPOCH,
+                      "; ann covariate ", ANN_VARIANT, ". ",
                       "FIT targets <= ", fold$train_last, "; ES ", fold$es_first, "..", fold$es_last,
                       " (ES-A <= ", fold$es_a_last, " sets interval params, ES-B scores them); ",
                       "CAL ", fold$cal_first, "..", fold$cal_last, "; EVAL ", fold$eval_first,
@@ -203,8 +234,9 @@ for (y in EVAL_YEARS) {
                 y, crit, f$train_last, f$es_first, f$es_last, f$cal_first, f$cal_last,
                 f$eval_first, f$eval_last, crit))
     t0 <- Sys.time()
-    fit <- conf_train_one(f, crit, seed = 20261103L + y)
-    fp <- sprintf("model_traning/candidates/conf_fit_serving_y%d_%s.rds", y, crit)
+    fit <- conf_train_one(f, crit, seed = SEED_BASE + y)
+    fp <- sprintf("model_traning/candidates/conf_fit_serving_y%d_%s%s.rds", y, crit,
+                  if (nzchar(TAG)) paste0("_", TAG) else "")
     saveRDS(fit, fp)
     cat(sprintf("   saved %s (epoch %d, score %.5f, %.0fs)\n", fp, fit$early_stop$epoch,
                 fit$early_stop$score, as.numeric(difftime(Sys.time(), t0, units = "secs"))))
