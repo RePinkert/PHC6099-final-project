@@ -10,3 +10,4 @@ data-raw/openei/
 docs/*.html
 data-raw/zipshare/
 data-raw/eia861m/
+model_traning/candidates/

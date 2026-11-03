@@ -1,5 +1,22 @@
 # lifewatt 0.0.0.9000
 
+* **置信度目标的第一轮自主迭代（研究分支 `model_training`，未发货）**：
+  新增"无嵌套"的四年置信度协议与区间构造库，并把**置信度**（而不是点误差）当作训练目标。
+  - `R/conf-protocol.R`、`R/conf-intervals.R`、`R/conf-harness.R`：包内内部函数。
+    协议按目标月把数据分成 FIT / ES / CAL / EVAL 四段，**角色两两不相交**；
+    区间参数只用参考段估计，评估段只读一次；分位数用有限样本 conformal 秩 `ceil((n+1)p)`。
+  - `model_traning/conf_train_folds.R`：滚动起点重训（每个评估年一个只看过去的模型），
+    早停准则可选 MSE（控制组）或 **WIS（区间评分 + 覆盖偏差）**。
+  - `model_traning/conf_iterate.R` / `conf_report.R`：7 种区间构造 x 2 种早停准则的自主迭代、
+    开发折/留出折分离、外推段建议区间与数据使用台账。
+  - `tests/testthat/test-conf-protocol.R`：钉住"不嵌套"与 conformal 秩/WIS 的硬约束。
+  - 主要结论（留出折 2025，名义 90%）：随包经验分位数口径覆盖 **0.831**，选定构造
+    （有限样本 conformal + 尺度归一化 + 偏差校正）覆盖 **0.8895**，相对宽度 +31%；
+    四年覆盖画像 0.786 / 0.904 / 0.850 / 0.890（年际摆动 ±6 点）。
+  - 另一发现：**外推段的主要风险是模型崩而不是区间窄**——距训练端 3 年的折上 1.0% 的预测
+    非有限、3.0% 越界，而运行时没有闸门；建议出数前加稳定性检查。
+  - 随包 `inst/extdata/price_lstm_fit.rds` **未改动**；详见 `model_traning/HANDOVER_confidence.md`。
+
 * The price LSTM is retrained a second time (v3) and the seam into 2026-08 is
   fixed. Retrained on the Mac: early stop at epoch 146, pure-R vs torch parity
   8.8e-07 (price) / 6.8e-08 (sd). Tests: 733 PASS / 0 FAIL / 0 SKIP.

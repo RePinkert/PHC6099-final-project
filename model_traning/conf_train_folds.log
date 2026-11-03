@@ -1,0 +1,27 @@
+== rolling-origin fits ==
+-- fold 2022 (mse): train<=2019-12 es=2020-01..2020-12 cal=2021-01..2021-12 eval=2022-01..2022-12 crit=mse
+   epoch  20 es_mse 0.6234 es_wis 3.6467 es_cov 0.816
+   epoch  40 es_mse 0.4871 es_wis 3.0134 es_cov 0.837
+   epoch  60 es_mse 0.4337 es_wis 2.8336 es_cov 0.837
+   epoch  80 es_mse 0.3866 es_wis 2.6732 es_cov 0.828
+   epoch 100 es_mse 0.3675 es_wis 2.7093 es_cov 0.826
+   epoch 120 es_mse 0.3789 es_wis 3.0015 es_cov 0.792
+   epoch 140 es_mse 0.3587 es_wis 2.8170 es_cov 0.803
+   epoch 160 es_mse 0.3493 es_wis 3.0845 es_cov 0.772
+   epoch 180 es_mse 0.3557 es_wis 2.6605 es_cov 0.829
+   epoch 200 es_mse 0.3520 es_wis 2.9311 es_cov 0.804
+   epoch 220 es_mse 0.3478 es_wis 2.7350 es_cov 0.837
+   early stop at epoch 233 
+   saved model_traning/candidates/conf_fit_y2022_mse.rds (epoch 173, score 0.32718, 447s)
+-- fold 2022 (wis): train<=2019-12 es=2020-01..2020-12 cal=2021-01..2021-12 eval=2022-01..2022-12 crit=wis
+   epoch  20 es_mse 0.6234 es_wis 3.6467 es_cov 0.816
+   epoch  40 es_mse 0.4871 es_wis 3.0134 es_cov 0.837
+   epoch  60 es_mse 0.4337 es_wis 2.8336 es_cov 0.837
+   epoch  80 es_mse 0.3866 es_wis 2.6732 es_cov 0.828
+   epoch 100 es_mse 0.3675 es_wis 2.7093 es_cov 0.826
+   epoch 120 es_mse 0.3789 es_wis 3.0015 es_cov 0.792
+   epoch 140 es_mse 0.3587 es_wis 2.8170 es_cov 0.803
+   epoch 160 es_mse 0.3493 es_wis 3.0845 es_cov 0.772
+   epoch 180 es_mse 0.3557 es_wis 2.6605 es_cov 0.829
+   epoch 200 es_mse 0.3520 es_wis 2.9311 es_cov 0.804
+   epoch 220 es_mse 0.3478 es_wis 2.7350 es_cov 0.837

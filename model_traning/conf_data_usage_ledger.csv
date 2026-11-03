@@ -1,0 +1,6 @@
+"role","target_months","used_for","nested"
+"FIT","<=2019-12 (fold 2022) .. <=2022-12 (fold 2025)","weights (per fold, rolling origin)","no"
+"ES","per fold: y-2","early stopping (epoch choice)","no"
+"CAL","per fold: y-1","interval parameters (quantiles/bias/scale)","no"
+"EVAL(dev)","2022-01..2024-12","selection of the construction","no"
+"EVAL(holdout)","2025-01..2025-12","final report only","no"
