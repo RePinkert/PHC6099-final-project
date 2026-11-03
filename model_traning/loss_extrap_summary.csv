@@ -1,0 +1,11 @@
+"metric","value"
+"n_states",51
+"median_rel_err",-0.00955029828721648
+"p90_abs_rel_err",0.0371101228670315
+"max_abs_rel_err",0.116152622829085
+"shipped_band_half_rel_median",0.064504065881747
+"shipped_coverage",0.980392156862745
+"shipped_coverage_csv",0.980392156862745
+"recommended_coverage",0.96078431372549
+"recommended_width_rel_median",0.1839
+"shipped_width_rel_median",0.064504065881747
