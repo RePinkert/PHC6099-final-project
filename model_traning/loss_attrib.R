@@ -1,5 +1,12 @@
 # model_traning/loss_attrib.R —— 预测损失归因（先量后改）
 #
+# **W0 之后不可原样重跑（2026-11）**：本脚本读 `inst/extdata/zip_utility_share_slim.csv.gz`
+# 来量化 L8（权重规则）与 L1（ZIP 内混合）。W0 删掉了那个资产与整个 ZIP→utility 混合层
+# （见 docs/confidence-plan.md 的 D1），所以：
+#   * 已入库的 loss_attrib.csv / candidates/loss_variant_zip.csv 是**历史记录**，保留；
+#   * 重跑会在 L1/L8 段失败，这是预期的：那两层已不存在；
+#   * 若要重算 L2/L3/L6/L7，把 L1/L8 两段注释掉即可。
+#
 # 目的：把"最终输出的精度损失"按层拆开，量化每一层吃掉多少，
 #       决定哪些层值得重构（减层 / 复用数据结构 / 去共线）。
 #
