@@ -5,7 +5,7 @@
 \title{Expected life expectancy loss for a ZIP code at a month}
 \usage{
 expected_life_loss(
-  zipcode,
+  state,
   time,
   bill = NULL,
   usage = NULL,
@@ -14,7 +14,9 @@ expected_life_loss(
 )
 }
 \arguments{
-\item{zipcode}{A character or numeric US ZIP code.}
+\item{state}{A two-letter USPS state code (\code{"FL"}) or a full state name.
+The price layer is state-level, so a ZIP is refused; resolve one with
+\code{\link[=zip_to_state]{zip_to_state()}} first.}
 
 \item{time}{A month ("YYYY-MM", "YYYY/M", "YYYY/MM" or Date); exactly one value.}
 
@@ -50,8 +52,9 @@ population / -1.0 to -2.7 most deprived) and Chirakijja et al. (NBER WP
 }
 \examples{
 \dontrun{
-expected_life_loss("32601", "2026-07")
-expected_life_loss("32601", "2026-12", bill = 180, usage = 1200)
-expected_life_loss("32601", "2026-12", delta_le = 0.01)
+expected_life_loss("FL", "2026-07")
+expected_life_loss("FL", "2026-12", bill = 180, usage = 1200)
+expected_life_loss("FL", "2026-12", delta_le = 0.01)
+expected_life_loss(zip_to_state("32601")$state, "2026-07")
 }
 }

@@ -4,10 +4,12 @@
 \alias{my_electricity}
 \title{Estimated electricity situation for a ZIP code at a month}
 \usage{
-my_electricity(zipcode, bill = NULL, time, usage = NULL, meas_sd = 1)
+my_electricity(state, bill = NULL, time, usage = NULL, meas_sd = 1)
 }
 \arguments{
-\item{zipcode}{A character or numeric US ZIP code.}
+\item{state}{A two-letter USPS state code (\code{"FL"}) or a full state name.
+The price layer is state-level, so a ZIP is refused; resolve one with
+\code{\link[=zip_to_state]{zip_to_state()}} first.}
 
 \item{bill}{Optional monthly electricity bill in USD; default unset (it is evidence,
 not a required input).}
@@ -34,7 +36,7 @@ with \code{bill} treated as Bayesian evidence (descriptive by itself; posterior 
 }
 \examples{
 \dontrun{
-my_electricity("32601", time = "2026-07")
-my_electricity("32601", bill = 180, time = "2026-12")
+my_electricity("FL", time = "2026-07")
+my_electricity("FL", bill = 180, time = "2026-12")
 }
 }

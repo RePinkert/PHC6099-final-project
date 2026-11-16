@@ -1,5 +1,8 @@
+# test-life-loss.R —— expected_life_loss() 的证据/扣留契约（W0 起收州）
+
 test_that("observed regime, no bill: pure price + withheld loss columns", {
-  r <- expected_life_loss("32601", "2026-07")
+  r <- expected_life_loss(anchor_state_fl, "2026-07")
+  expect_equal(r$state, "FL")
   expect_equal(r$regime, "observed")
   expect_equal(r$evidence_regime, "none")
   expect_true(is.na(r$implied_usage_kwh))
@@ -9,10 +12,11 @@ test_that("observed regime, no bill: pure price + withheld loss columns", {
   expect_equal(r$e0_anchor_year, 2024L)
   expect_equal(r$e0_anchor, 79.0)
   expect_true(grepl("NVSR 75/5", r$e0_source))
+  expect_false("zip" %in% names(r))   # W0：行内不再有 ZIP
 })
 
 test_that("predicted regime, bill only: descriptive implied usage, no posterior", {
-  r <- expected_life_loss("32601", "2026-12", bill = 180)
+  r <- expected_life_loss(anchor_state_fl, "2026-12", bill = 180)
   expect_equal(r$regime, "predicted")
   expect_equal(r$evidence_regime, "descriptive")
   expect_equal(r$implied_usage_kwh, 180 * 100 / r$price)
@@ -20,7 +24,7 @@ test_that("predicted regime, bill only: descriptive implied usage, no posterior"
 })
 
 test_that("predicted regime, bill+usage: posterior equals inverse-variance blend", {
-  r <- expected_life_loss("32601", "2026-12", bill = 180, usage = 1200, meas_sd = 1)
+  r <- expected_life_loss(anchor_state_fl, "2026-12", bill = 180, usage = 1200, meas_sd = 1)
   expect_equal(r$evidence_regime, "posterior")
   prior <- lifewatt:::.lstm_predict("FL", "2026-12")
   p_meas <- 180 * 100 / 1200
@@ -33,7 +37,7 @@ test_that("predicted regime, bill+usage: posterior equals inverse-variance blend
 })
 
 test_that("observed regime, bill+usage: local measurement alongside measured state price", {
-  r <- expected_life_loss("32601", "2026-07", bill = 150, usage = 1000)
+  r <- expected_life_loss(anchor_state_fl, "2026-07", bill = 150, usage = 1000)
   expect_equal(r$evidence_regime, "measured_local")
   expect_equal(r$price_meas, 150 * 100 / 1000)
   expect_true(is.na(r$price_posterior))  # nothing to blend with: no posterior is claimed
@@ -42,7 +46,7 @@ test_that("observed regime, bill+usage: local measurement alongside measured sta
 })
 
 test_that("delta_le supplied: loss columns computed against the anchor", {
-  r <- expected_life_loss("32601", "2026-09", delta_le = 0.01)
+  r <- expected_life_loss(anchor_state_fl, "2026-09", delta_le = 0.01)
   expect_equal(r$le_loss_years, 0.01)
   expect_equal(r$le_loss_pct_of_anchor, 0.01 / 79.0 * 100)
   expect_true(grepl("caller-declared sensitivity parameter", r$sensitivity_assumption))
@@ -52,7 +56,7 @@ test_that("delta_le supplied: loss columns computed against the anchor", {
 })
 
 test_that("anchor routing (D2 2023/2024, fallback declared for pre-2023 years)", {
-  r <- expected_life_loss("32601", "2023-01")
+  r <- expected_life_loss(anchor_state_fl, "2023-01")
   expect_equal(r$e0_anchor_year, 2023L)
   expect_equal(r$e0_anchor, 78.4)
   expect_false(grepl("outside anchor table", r$notes))
@@ -63,18 +67,26 @@ test_that("anchor routing (D2 2023/2024, fallback declared for pre-2023 years)",
 })
 
 test_that("honest errors", {
-  expect_error(expected_life_loss("32601", "2026-07", bill = -5), "positive", fixed = TRUE)
-  expect_error(expected_life_loss("32601", "2026-07", usage = 50), "usage without bill", fixed = TRUE)
-  expect_error(expected_life_loss("32601", "2026-07", bill = 100, usage = -1), "usage must be", fixed = TRUE)
-  expect_error(expected_life_loss("32601", "2026-07", delta_le = NA_real_), "finite", fixed = TRUE)
-  expect_error(expected_life_loss("32601", "2026-07", meas_sd = 0), "meas_sd must be a positive number", fixed = TRUE)
+  expect_error(expected_life_loss(anchor_state_fl, "2026-07", bill = -5), "positive", fixed = TRUE)
+  expect_error(expected_life_loss(anchor_state_fl, "2026-07", usage = 50), "usage without bill", fixed = TRUE)
+  expect_error(expected_life_loss(anchor_state_fl, "2026-07", bill = 100, usage = -1), "usage must be", fixed = TRUE)
+  expect_error(expected_life_loss(anchor_state_fl, "2026-07", delta_le = NA_real_), "finite", fixed = TRUE)
+  expect_error(expected_life_loss(anchor_state_fl, "2026-07", meas_sd = 0), "meas_sd must be a positive number", fixed = TRUE)
 })
 
 test_that("implausible bill / usage combinations are refused, not turned into evidence", {
-  expect_error(expected_life_loss("32601", "2026-08", bill = 5000, usage = 1),
+  expect_error(expected_life_loss(anchor_state_fl, "2026-08", bill = 5000, usage = 1),
                "outside the plausible 1..150 range", fixed = TRUE)
-  expect_error(my_electricity("32601", bill = 1, usage = 5000, time = "2026-08"),
+  expect_error(my_electricity(anchor_state_fl, bill = 1, usage = 5000, time = "2026-08"),
                "outside the plausible 1..150 range", fixed = TRUE)
-  r <- expected_life_loss("32601", "2026-08", bill = 180, usage = 1200)
+  r <- expected_life_loss(anchor_state_fl, "2026-08", bill = 180, usage = 1200)
   expect_equal(r$price_meas, 15)
+})
+
+test_that("the ZIP entry point is refused and points at zip_to_state()", {
+  err <- tryCatch(expected_life_loss(anchor_zip_fl, "2026-07"), error = function(e) conditionMessage(e))
+  expect_match(err, "looks like a ZIP code", fixed = TRUE)
+  expect_match(err, "zip_to_state", fixed = TRUE)
+  ## 走一遍文档承诺的路径：ZIP -> 州 -> 价格
+  expect_equal(expected_life_loss(zip_to_state(anchor_zip_fl)$state, "2026-07")$state, "FL")
 })

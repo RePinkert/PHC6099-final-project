@@ -1,4 +1,4 @@
-# life_expectancy_trend() —— exp#43 季度合成趋势（yoy|qoq；源为季度频，mom 诚实拒绝）。
+# life_expectancy_trend() —— exp#43 季度合成趋势（yoy|qoq；源为季度频，mom 诚实拒绝；W0 起收州）。
 #' Change in synthetic life expectancy over time
 #'
 #' Quarter-over-period change in the [life_expectancy()] synthetic estimate:
@@ -6,7 +6,9 @@
 #' previous quarter (the VSRR source is quarterly — the placeholder `"mom"`
 #' period is not available and is refused honestly).
 #'
-#' @param zip A character or numeric US ZIP code.
+#' Takes a state, not a ZIP code; resolve a ZIP with [zip_to_state()].
+#'
+#' @param state A two-letter USPS state code (`"FL"`) or a full state name.
 #' @param period One of `"yoy"` or `"qoq"`.
 #' @param quarter A quarter ("YYYY-Qn"); default: the latest VSRR quarter shipped.
 #' @return A one-row data.frame with the from/to synthetic e0 values, their
@@ -16,20 +18,19 @@
 #'
 #' @examples
 #' \dontrun{
-#' life_expectancy_trend("32601", period = "yoy")
-#' life_expectancy_trend("32601", period = "qoq")
+#' life_expectancy_trend("FL", period = "yoy")
+#' life_expectancy_trend("FL", period = "qoq")
 #' }
-life_expectancy_trend <- function(zip, period = c("yoy", "qoq"), quarter = NULL) {
+life_expectancy_trend <- function(state, period = c("yoy", "qoq"), quarter = NULL) {
   period <- match.arg(period)
+  state <- .state_code(state)
   if (is.null(quarter)) quarter <- .vsrr_latest_quarter()
   quarter <- as.character(quarter)
   from <- .quarter_shift(quarter, if (period == "yoy") -4L else -1L)
-  zs <- .zip_state(zip)
-  to_s <- .le_synth(zs$state, quarter, "12m")
-  from_s <- .le_synth(zs$state, from, "12m")
+  to_s <- .le_synth(state, quarter, "12m")
+  from_s <- .le_synth(state, from, "12m")
   data.frame(
-    zip = .zip5(zip),
-    state = zs$state,
+    state = state,
     period = period,
     from_quarter = from,
     to_quarter = quarter,
@@ -42,8 +43,8 @@ life_expectancy_trend <- function(zip, period = c("yoy", "qoq"), quarter = NULL)
     estimate_type = "synthetic_e0 change (mortality-based D1b/D2 sensitivity synthesis)",
     source = to_s$source,
     level = to_s$level,
-    degraded_from = "zip",
-    mapping_vintage = zs$mapping_vintage,
+    degraded_from = NA_character_,
+    mapping_vintage = NA_character_,
     provisional = TRUE,
     sensitivity_assumption = to_s$sensitivity_assumption,
     confidence_tier = .confidence_tier("C"),

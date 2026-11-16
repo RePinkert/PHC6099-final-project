@@ -1,5 +1,5 @@
-# test-price-lstm.R —— LSTM 预测 regime 的冻结契约
-# 三层钉死：①黄金值 1e-10（纯 R 前向 vs 冻结夹具，防实现漂移）
+# test-price-lstm.R —�?LSTM 预测 regime 的冻结契�?
+# 三层钉死：①黄金�?1e-10（纯 R 前向 vs 冻结夹具，防实现漂移�?
 #           ②独立朴素前向对拍（测试内重算，防两侧同错）
 #           ③窗口契约（h=1..5 供给、越界诚实拒绝）
 
@@ -20,7 +20,7 @@ test_that("lstm forward recomputes independently (naive loop, in-test reference)
   W <- fit$weights
   hs <- fit$n_hidden
   w <- lifewatt:::.lstm_feature_window("FL", fit$fit_as_of)
-  ## 朴素逐步重算：显式循环 + 门展开（与 R/price-lstm.R 向量化实现不同路径）
+  ## 朴素逐步重算：显式循�?+ 门展开（与 R/price-lstm.R 向量化实现不同路径）
   h <- rep(0, hs); cc <- rep(0, hs)
   for (t in seq_len(nrow(w))) {
     x <- w[t, ]
@@ -54,17 +54,17 @@ test_that("lstm window contract: horizons 1..5 only, refusals are honest", {
   expect_error(lifewatt:::.lstm_predict("FL", "2027-01"), "horizons 1..5")
   expect_error(lifewatt:::.lstm_predict(c("FL", "FL"), "2026-12"), "aligned")
   expect_error(lifewatt:::.lstm_predict("ZZ", "2026-12"), "outside the LSTM fit coverage")
-  expect_error(expected_life_loss("32601", "2027-01"), "outside the supported window")
+  expect_error(expected_life_loss("FL", "2027-01"), "outside the supported window")
 })
 
 test_that("price_at predicted branch serves the LSTM source for the gap months", {
-  r <- lifewatt:::.price_at("32601", "2026-10")
+  r <- lifewatt:::.price_at("FL", "2026-10")
   expect_equal(r$regime, "predicted")
   expect_match(r$source, "LSTM price forecast", fixed = TRUE)
   expect_true(is.finite(r$price_sd) && r$price_sd > 0)
-  ## 4 年窗口闭合：2026-08..12 全部由拟合数据供给
+  ## 4 年窗口闭合：2026-08..12 全部由拟合数据供�?
   for (p in sprintf("2026-%02d", 8:12)) {
-    rr <- lifewatt:::.price_at("32601", p)
+    rr <- lifewatt:::.price_at("FL", p)
     expect_equal(rr$regime, "predicted")
     expect_true(is.finite(rr$price) && rr$price > 0)
   }
@@ -79,11 +79,11 @@ test_that("lstm fit contract ledger is intact", {
   expect_true(all(is.finite(fit$forecast$price)))
   expect_true(all(fit$forecast$q_lo < fit$forecast$price &
                     fit$forecast$price < fit$forecast$q_hi))
-  ## 85% 区间覆盖率台账在验收带 [0.85, 0.95]（校准口径）
+  ## 85% 区间覆盖率台账在验收�?[0.85, 0.95]（校准口径）
   expect_true(all(fit$coverage$calib_in_sample >= 0.80))
-  ## 区间直接取残差的 5%/95% 分位，不做对称化（偏斜方向随 h 变化：h=1..4 右偏，h=5 左偏）
+  ## 区间直接取残差的 5%/95% 分位，不做对称化（偏斜方向随 h 变化：h=1..4 右偏，h=5 左偏�?
   expect_true(all(abs(fit$intervals$r_q95 + fit$intervals$r_q05) > 1e-6))
-  ## 去掉偏差校正后不再携带 point_bias；早停窗偏差只作诊断
+  ## 去掉偏差校正后不再携�?point_bias；早停窗偏差只作诊断
   expect_null(fit$point_bias)
   expect_length(fit$es_bias_diagnostic, fit$h_max)
 })
@@ -92,7 +92,7 @@ test_that("package prediction path carries no torch dependency", {
   p <- system.file("DESCRIPTION", package = "lifewatt")
   desc <- if (nzchar(p)) readLines(p) else readLines(test_path("..", "..", "DESCRIPTION"))
   expect_false(any(grepl("torch", desc)))
-  # 安装态（R CMD check）没有 ../../NAMESPACE；用运行时已加载的导入表，两种模式都成立
+  # 安装态（R CMD check）没�?../../NAMESPACE；用运行时已加载的导入表，两种模式都成立
   expect_false("torch" %in% names(getNamespaceImports("lifewatt")))
   lifewatt:::.lstm_predict("FL", "2026-12")
   expect_false("torch" %in% loadedNamespaces())
@@ -184,7 +184,7 @@ test_that("v3 relative channels match their definitions (log price / 12-month me
   p <- lifewatt:::.price_history_wide()["FL", ]
   M <- names(p); j <- match("2026-07", M)
   expect_equal(w[36, 1], log(p[[j]] / mean(p[(j - 11):j])), tolerance = 1e-12)
-  ## 2026-07 起点可用的最新年度值是 2024 年（2025-10 发布）
+  ## 2026-07 起点可用的最新年度值是 2024 年（2025-10 发布�?
   a <- utils::read.csv(system.file("extdata", "eia861_state_annual.csv.gz", package = "lifewatt"))
   a24 <- a$price[a$state == "FL" & a$year == 2024]
   k <- match("2025-10", M)

@@ -4,10 +4,10 @@
 \alias{life_expectancy_trend}
 \title{Change in synthetic life expectancy over time}
 \usage{
-life_expectancy_trend(zip, period = c("yoy", "qoq"), quarter = NULL)
+life_expectancy_trend(state, period = c("yoy", "qoq"), quarter = NULL)
 }
 \arguments{
-\item{zip}{A character or numeric US ZIP code.}
+\item{state}{A two-letter USPS state code (\code{"FL"}) or a full state name.}
 
 \item{period}{One of \code{"yoy"} or \code{"qoq"}.}
 
@@ -24,9 +24,12 @@ Quarter-over-period change in the \code{\link[=life_expectancy]{life_expectancy(
 previous quarter (the VSRR source is quarterly — the placeholder \code{"mom"}
 period is not available and is refused honestly).
 }
+\details{
+Takes a state, not a ZIP code; resolve a ZIP with \code{\link[=zip_to_state]{zip_to_state()}}.
+}
 \examples{
 \dontrun{
-life_expectancy_trend("32601", period = "yoy")
-life_expectancy_trend("32601", period = "qoq")
+life_expectancy_trend("FL", period = "yoy")
+life_expectancy_trend("FL", period = "qoq")
 }
 }

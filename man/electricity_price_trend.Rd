@@ -4,26 +4,32 @@
 \alias{electricity_price_trend}
 \title{Change in average electricity price over time}
 \usage{
-electricity_price_trend(zip, period = c("yoy", "mom"))
+electricity_price_trend(state, period = c("yoy", "mom"))
 }
 \arguments{
-\item{zip}{A character or numeric US ZIP code.}
+\item{state}{A two-letter USPS state code (\code{"FL"}) or a full state name.}
 
 \item{period}{One of \code{"yoy"} or \code{"mom"}.}
 }
 \value{
-A data.frame with the change (cents/kWh) and provenance columns. Positive
-change = price increase; negative = decrease.
+A data.frame with the change (cents/kWh) and provenance columns.
+Positive change = price increase; negative = decrease. The year-over-year
+rows also carry \code{n_utility} and \code{n_utility_prior}, because the set of
+priced utilities can differ between the two years.
 }
 \description{
-Year-over-year change of the ZIP-level annual price (EIA-861, 2024 and 2025 rows;
-utilities weighted by their population share inside the ZIP), or month-over-month
-change of the B1 state-level monthly series
-(42 rows; a flagged provisional change involves at least one provisional month).
+Year-over-year change of the state-level annual price (EIA-861, 2024 and 2025
+against their prior year), or month-over-month change of the B1 state-level
+monthly series (42 rows; a flagged provisional change involves at least one
+provisional month).
+}
+\details{
+Takes a state, not a ZIP code: see \code{\link[=electricity_price]{electricity_price()}} for why, and
+\code{\link[=zip_to_state]{zip_to_state()}} to resolve a ZIP.
 }
 \examples{
 \dontrun{
-electricity_price_trend("32601", period = "yoy")
-electricity_price_trend("32601", period = "mom")
+electricity_price_trend("FL", period = "yoy")
+electricity_price_trend("FL", period = "mom")
 }
 }

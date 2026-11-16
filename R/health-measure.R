@@ -54,6 +54,15 @@
 #' health_measure("32601", measure = c("DIABETES", "BPHIGH"))
 #' }
 health_measure <- function(zip, measure = NULL) {
+  # W0：价格/寿命层收州，这里是唯一仍收 ZIP 的接口（PLACES 按 ZCTA 发布）。
+  # 把州码传进来时指名解释这个不对称，而不是让它掉进"Invalid zip"。
+  if (is.character(zip) && length(zip) == 1L && !is.na(zip) &&
+      grepl("^[A-Za-z]{2}$", trimws(zip))) {
+    stop(sprintf(paste0(
+      "'%s' is a state code. health_measure() reports ZCTA-level data and needs a ZIP code; ",
+      "the state-level views are electricity_price(), life_expectancy() and expected_life_loss()."),
+      trimws(zip)), call. = FALSE)
+  }
   z <- .zip5(zip)
   d <- .places_fetch(z)
   need <- c("year", "measureid", "data_value", "data_value_type",

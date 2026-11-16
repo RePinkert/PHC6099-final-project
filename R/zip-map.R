@@ -110,21 +110,3 @@ zip_to_state <- function(zip) {
     row.names = NULL
   )
 }
-
-## 旧内部接口的过渡层：只保留 C2/C3 尚未改完的调用点需要的那几个字段。
-## 全部改完后删除。
-.zip_state <- function(zip) {
-  r <- .zip_resolve(zip)
-  list(
-    state = r$state,
-    utilities = r$utilities,
-    n_utility = r$n_utility,
-    mapping_vintage = r$mapping_vintage,
-    note = if (r$n_utility > 1L) {
-      sprintf(paste0("multi-utility zip (%d utilities); the zip selects the state only ",
-                     "(value is the state series, not a zip-weighted blend)"), r$n_utility)
-    } else {
-      ""
-    }
-  )
-}

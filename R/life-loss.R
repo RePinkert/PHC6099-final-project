@@ -92,7 +92,9 @@
 #' population / -1.0 to -2.7 most deprived) and Chirakijja et al. (NBER WP
 #' 25681, 2019) US heating-price winter-mortality direction evidence.
 #'
-#' @param zipcode A character or numeric US ZIP code.
+#' @param state A two-letter USPS state code (`"FL"`) or a full state name.
+#'   The price layer is state-level, so a ZIP is refused; resolve one with
+#'   [zip_to_state()] first.
 #' @param time A month ("YYYY-MM", "YYYY/M", "YYYY/MM" or Date); exactly one value.
 #' @param bill Optional monthly electricity bill in USD; Bayesian evidence (default: unset).
 #' @param usage Optional monthly usage in kWh; together with `bill` it forms a local
@@ -110,13 +112,14 @@
 #'
 #' @examples
 #' \dontrun{
-#' expected_life_loss("32601", "2026-07")
-#' expected_life_loss("32601", "2026-12", bill = 180, usage = 1200)
-#' expected_life_loss("32601", "2026-12", delta_le = 0.01)
+#' expected_life_loss("FL", "2026-07")
+#' expected_life_loss("FL", "2026-12", bill = 180, usage = 1200)
+#' expected_life_loss("FL", "2026-12", delta_le = 0.01)
+#' expected_life_loss(zip_to_state("32601")$state, "2026-07")
 #' }
-expected_life_loss <- function(zipcode, time, bill = NULL, usage = NULL,
+expected_life_loss <- function(state, time, bill = NULL, usage = NULL,
                                delta_le = NULL, meas_sd = 1) {
-  base <- .price_at(zipcode, time)
+  base <- .price_at(state, time)
   if (!is.numeric(meas_sd) || length(meas_sd) != 1L || !is.finite(meas_sd) || meas_sd <= 0) {
     stop("meas_sd must be a positive number (declared measurement sd, cents/kWh).", call. = FALSE)
   }

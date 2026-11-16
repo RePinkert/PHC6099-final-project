@@ -1,7 +1,9 @@
-# Internal price estimator `.price_at(zip, time)`（exp#32 实测分支，exp#33 补预测分支）
-# 口径：returns the state-level residential price at a month for the utility territory a zip belongs to.
+# Internal price estimator `.price_at(state, time)`（exp#32 实测分支，exp#33 补预测分支；W0 起收州）
+# 口径：returns the state-level residential price at a month.
 # B1 cache units = cents/kWh；provisional = EIA-861M 标 Preliminary（EIA 将回改，输出必须声明）。
 # 时间归一化：YYYY-MM 字符串、YYYY-M、"YYYY/MM"、Date；标量调用（mock 契约）。
+# W0：输入是州，不是 ZIP。`zip`、`utilities`、`weight_note` 三列随之消失，
+#     `degraded_from` 从 "zip" 变为 NA（不再有降级可声明），`n_utility` 改为该州的家数。
 
 .month_key <- function(time) {
   if (length(time) != 1L) stop("time expects exactly one value.", call. = FALSE)
@@ -23,8 +25,9 @@
   t
 }
 
-.price_at <- function(zip, time) {
+.price_at <- function(state, time) {
   fit <- .price_fit()
+  state <- .state_code(state)
   period <- .month_key(time)
   cutoff <- fit$fit_as_of
   if (period > "2026-12") {
@@ -33,15 +36,11 @@
                         "calibrated for horizons <= 13 months)."), period, cutoff),
          call. = FALSE)
   }
-  zs <- .zip_state(zip)
-  spread <- .within_state_spread(zs$state, as.integer(substr(period, 1L, 4L)))$sd
+  spread <- .within_state_spread(state, as.integer(substr(period, 1L, 4L)))
   if (period > cutoff) {
-    pr <- .lstm_predict(zs$state, period)
+    pr <- .lstm_predict(state, period)
     return(data.frame(
-      zip = .zip5(zip),
-      state = zs$state,
-      utilities = paste(zs$utilities$utility_name, collapse = "; "),
-      n_utility = zs$n_utility,
+      state = state,
       period = period,
       price = pr$price,
       unit = "cents/kWh",
@@ -51,30 +50,27 @@
       fit_as_of = cutoff,
       source = "LSTM price forecast (multi-horizon h=1..5; relative-residual horizon intervals, calibration window 2026-02..2026-07)",
       level = "state",
-      degraded_from = "zip",
-      mapping_vintage = "2024",
-      weight_note = zs$note,
-      within_state_sd = spread,
+      degraded_from = NA_character_,
+      mapping_vintage = NA_character_,
+      within_state_sd = spread$sd,
+      n_utility = spread$n_utility,
       confidence_tier = .confidence_tier("C"),
       stringsAsFactors = FALSE,
       row.names = NULL
     ))
   }
   d <- .monthly_cache()
-  row <- d[d$state == zs$state & d$period == period, ]
+  row <- d[d$state == state & d$period == period, ]
   if (nrow(row) == 0L) {
     stop(sprintf("B1 cache has no record for state %s at %s (observed window 2023-01 -> %s).",
-                 zs$state, period, cutoff), call. = FALSE)
+                 state, period, cutoff), call. = FALSE)
   }
   if (!is.finite(row$price) || row$price <= 0) {
     stop(sprintf("B1 cache price invalid for %s at %s; refusing to build evidence on it.",
-                 zs$state, period), call. = FALSE)
+                 state, period), call. = FALSE)
   }
   data.frame(
-    zip = .zip5(zip),
-    state = zs$state,
-    utilities = paste(zs$utilities$utility_name, collapse = "; "),
-    n_utility = zs$n_utility,
+    state = state,
     period = period,
     price = row$price,
     unit = "cents/kWh",
@@ -84,10 +80,10 @@
     fit_as_of = NA_character_,
     source = "EIA retail-sales monthly (B1; inst/extdata cache)",
     level = "state",
-    degraded_from = "zip",
-    mapping_vintage = "2024",
-    weight_note = zs$note,
-    within_state_sd = spread,
+    degraded_from = NA_character_,
+    mapping_vintage = NA_character_,
+    within_state_sd = spread$sd,
+    n_utility = spread$n_utility,
     confidence_tier = .confidence_tier("B"),
     stringsAsFactors = FALSE,
     row.names = NULL

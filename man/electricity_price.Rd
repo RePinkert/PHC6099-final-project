@@ -2,37 +2,49 @@
 % Please edit documentation in R/electricity-price.R
 \name{electricity_price}
 \alias{electricity_price}
-\title{Average residential electricity price for a ZIP code}
+\title{Average residential electricity price for a state}
 \usage{
-electricity_price(zip, year = NULL, period = NULL)
+electricity_price(state, year = NULL, period = NULL)
 }
 \arguments{
-\item{zip}{A character or numeric US ZIP code.}
+\item{state}{A two-letter USPS state code (\code{"FL"}) or a full state name
+(\code{"Florida"}). A ZIP code is refused by name, because it would promise a
+granularity the data do not have.}
 
-\item{year}{A single integer year (2023-2025) for the ZIP-level annual estimate.}
+\item{year}{A single integer year (2023-2025) for the state-level annual
+estimate.}
 
-\item{period}{Pass \code{"mom"} for the state-level monthly series of the ZIP (43 rows).}
+\item{period}{Pass \code{"mom"} for the state-level monthly series (43 rows).}
 }
 \value{
-A data.frame with the price (cents/kWh), provenance columns
-(source/level/degraded_from/mapping_vintage/provisional) and a \code{confidence_tier}
-label; one row for the annual regime (with the mapped utilities' \code{price_min} /
-\code{price_max}), 43 rows for the monthly series (with \code{within_state_sd}, the
-customer-weighted spread of utility prices inside the state).
+A data.frame with the price (cents/kWh), the provenance columns
+(\code{source}/\code{level}/\code{degraded_from}/\code{mapping_vintage}/\code{provisional}) and a
+\code{confidence_tier} label; one row for the annual regime (with \code{price_min},
+\code{price_max} and \code{n_utility} for the state's utilities), 43 rows for the
+monthly series (with \code{within_state_sd}, the customer-weighted spread of
+utility prices inside the state).
 }
 \description{
-Returns the residential electricity price estimate for the utility territory a US
-ZIP code belongs to. The annual ZIP-level estimate blends EIA-861 utility prices
-(final releases 2023-2025) over the utilities the OpenEI 2024 mapping assigns to the
-ZIP, weighted by each utility's 2020 population share inside the ZIP (census blocks
-x HIFLD service territories); ZIPs without a share fall back to system-wide
-residential customers, and \code{weight_basis} says which applied. The monthly series is the B1 state-level
-retail-sales cache (2023-01 to 2026-07); months EIA marks Preliminary are provisional
-and flagged.
+Returns the state-level residential electricity price. The annual value is
+the customer-weighted mean of the state's EIA-861 utility prices (final
+releases 2023-2025), with the cheapest and dearest utility in the state
+reported alongside it; the monthly series is the B1 state-level retail-sales
+cache (2023-01 to 2026-07), and months EIA marks Preliminary are provisional.
+}
+\details{
+This function takes a state, not a ZIP code: no source publishes a realised
+average residential price per ZIP, so every ZIP in a state would return the
+same number. Use \code{\link[=zip_to_state]{zip_to_state()}} to resolve a ZIP, and read \code{price_min} /
+\code{price_max} / \code{within_state_sd} as the declared distance between the state
+value and the utilities inside it.
 }
 \examples{
 \dontrun{
-electricity_price("32601", year = 2024)
-electricity_price("32601", period = "mom")
+electricity_price("FL", year = 2024)
+electricity_price("FL", period = "mom")
+electricity_price(zip_to_state("32601")$state, year = 2024)
 }
+}
+\seealso{
+\code{\link[=zip_to_state]{zip_to_state()}}, \code{\link[=electricity_price_trend]{electricity_price_trend()}}, \code{\link[=my_electricity]{my_electricity()}}
 }

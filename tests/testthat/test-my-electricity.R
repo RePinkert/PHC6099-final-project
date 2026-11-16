@@ -1,5 +1,7 @@
+# test-my-electricity.R —— my_electricity()：能源侧包装（W0 起收州）
+
 test_that("my_electricity mirrors the shared machinery (bill descriptive)", {
-  r <- my_electricity("32601", bill = 180, time = "2026-12")
+  r <- my_electricity(anchor_state_fl, bill = 180, time = "2026-12")
   expect_s3_class(r, "data.frame")
   expect_equal(r$regime, "predicted")
   expect_equal(r$evidence_regime, "descriptive")
@@ -10,24 +12,26 @@ test_that("my_electricity mirrors the shared machinery (bill descriptive)", {
 })
 
 test_that("my_electricity observed regime keeps provenance (no bill)", {
-  r <- my_electricity("32601", time = "2026-07")
+  r <- my_electricity(anchor_state_fl, time = "2026-07")
   expect_equal(r$regime, "observed")
   expect_equal(r$price, 15.03)
   expect_equal(r$evidence_regime, "none")
   expect_equal(r$source, "EIA retail-sales monthly (B1; inst/extdata cache)")
   expect_false(grepl("LE|life", r$notes))  # energy-side only, no LE leakage
+  expect_true(is.na(r$degraded_from))
 })
 
 test_that("my_electricity bill+usage posterior matches expected_life_loss's evidence", {
-  a <- my_electricity("32601", bill = 180, time = "2026-12", usage = 1200, meas_sd = 1)
-  b <- expected_life_loss("32601", "2026-12", bill = 180, usage = 1200, meas_sd = 1)
+  a <- my_electricity(anchor_state_fl, bill = 180, time = "2026-12", usage = 1200, meas_sd = 1)
+  b <- expected_life_loss(anchor_state_fl, "2026-12", bill = 180, usage = 1200, meas_sd = 1)
   expect_equal(a$price_posterior, b$price_posterior)
   expect_equal(a$evidence_regime, "posterior")
   expect_equal(a$price, b$price)
 })
 
 test_that("my_electricity honest errors (shared validation)", {
-  expect_error(my_electricity("32601", bill = -1, time = "2026-07"), "positive", fixed = TRUE)
-  expect_error(my_electricity("32601", time = "2026-07", usage = 50), "usage without bill", fixed = TRUE)
-  expect_error(my_electricity("32601", time = "2026-07", meas_sd = -2), "meas_sd must be", fixed = TRUE)
+  expect_error(my_electricity(anchor_state_fl, bill = -1, time = "2026-07"), "positive", fixed = TRUE)
+  expect_error(my_electricity(anchor_state_fl, time = "2026-07", usage = 50), "usage without bill", fixed = TRUE)
+  expect_error(my_electricity(anchor_state_fl, time = "2026-07", meas_sd = -2), "meas_sd must be", fixed = TRUE)
+  expect_error(my_electricity(anchor_zip_fl, time = "2026-07"), "looks like a ZIP code", fixed = TRUE)
 })

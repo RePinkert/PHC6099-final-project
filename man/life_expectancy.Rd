@@ -2,12 +2,12 @@
 % Please edit documentation in R/life-expectancy.R
 \name{life_expectancy}
 \alias{life_expectancy}
-\title{Synthetic life expectancy for a ZIP code}
+\title{Synthetic life expectancy for a state}
 \usage{
-life_expectancy(zip, quarter = NULL)
+life_expectancy(state, quarter = NULL)
 }
 \arguments{
-\item{zip}{A character or numeric US ZIP code.}
+\item{state}{A two-letter USPS state code (\code{"FL"}) or a full state name.}
 
 \item{quarter}{A quarter ("YYYY-Qn"); default: the latest VSRR quarter shipped.}
 }
@@ -19,17 +19,21 @@ provenance columns (source/level/degraded_from/mapping_vintage/provisional)
 plus the \code{sensitivity_assumption} declaration.
 }
 \description{
-Returns a \strong{synthetic} life-expectancy estimate for the state the ZIP belongs
-to: the D1b/D2 sensitivity synthesis (internal mortality-synth layer) — the
-state's mortality index (VSRR age-adjusted rate vs US) applied to the national
+Returns a \strong{synthetic} life-expectancy estimate for a state: the D1b/D2
+sensitivity synthesis (internal mortality-synth layer) — the state's
+mortality index (VSRR age-adjusted rate vs US) applied to the national
 age pattern, converted through an abridged life table and anchored to the
 published NCHS national e0. This is a declared-assumption estimate, \strong{not} an
 NCHS-published subnational life expectancy; every assumption travels in the
 \code{sensitivity_assumption} column (estimate_type says "synthetic_e0").
 }
+\details{
+Takes a state, not a ZIP code: the VSRR source is state-level, so a ZIP would
+only be used to select the state. Use \code{\link[=zip_to_state]{zip_to_state()}} to resolve one.
+}
 \examples{
 \dontrun{
-life_expectancy("32601")
-life_expectancy("32601", quarter = "2024Q4")
+life_expectancy("FL")
+life_expectancy("FL", quarter = "2024Q4")
 }
 }

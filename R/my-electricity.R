@@ -8,7 +8,9 @@
 #' with `bill` treated as Bayesian evidence (descriptive by itself; posterior when
 #' `usage` is also supplied).
 #'
-#' @param zipcode A character or numeric US ZIP code.
+#' @param state A two-letter USPS state code (`"FL"`) or a full state name.
+#'   The price layer is state-level, so a ZIP is refused; resolve one with
+#'   [zip_to_state()] first.
 #' @param bill Optional monthly electricity bill in USD; default unset (it is evidence,
 #'   not a required input).
 #' @param time A month ("YYYY-MM", "YYYY/M", "YYYY/MM" or Date); exactly one value.
@@ -24,11 +26,11 @@
 #'
 #' @examples
 #' \dontrun{
-#' my_electricity("32601", time = "2026-07")
-#' my_electricity("32601", bill = 180, time = "2026-12")
+#' my_electricity("FL", time = "2026-07")
+#' my_electricity("FL", bill = 180, time = "2026-12")
 #' }
-my_electricity <- function(zipcode, bill = NULL, time, usage = NULL, meas_sd = 1) {
-  base <- .price_at(zipcode, time)
+my_electricity <- function(state, bill = NULL, time, usage = NULL, meas_sd = 1) {
+  base <- .price_at(state, time)
   if (!is.numeric(meas_sd) || length(meas_sd) != 1L || !is.finite(meas_sd) || meas_sd <= 0) {
     stop("meas_sd must be a positive number (declared measurement sd, cents/kWh).", call. = FALSE)
   }

@@ -1,56 +1,61 @@
-test_that("A1 annual price: population-share blend (anchor: 32601 @2024)", {
-  r <- lifewatt:::.zip_annual_price("32601", 2024)
+# test-a1-layer.R —— A1 年度层：州年价（W0 起不再有 ZIP 混合）
+# 契约：price 与 price_min/max/n_utility 必须取自**同一个** utility 集合（该州的居民 utility，
+# 排除 EIA 的 99999 调整伪 utility），否则"州值 vs 州内范围"不可比。
+
+test_that("A1 state annual price is the customer-weighted mean of the state's utilities", {
+  r <- lifewatt:::.state_annual_price("FL", 2024)
   expect_equal(r$state, "FL")
-  expect_equal(r$n_mapped, 2L)
-  expect_equal(r$n_priced, 2L)
-  expect_equal(r$weight_basis, "population_share")
-  slim <- lifewatt:::.annual_slim()
-  s <- slim[slim$year == 2024 & slim$state == "FL" & slim$eiaid %in% c("3757", "6909"), ]
-  sh <- lifewatt:::.zip_shares("32601")
-  w <- sh$pop_share[match(s$eiaid, sh$eiaid)]
-  expect_equal(r$price, weighted.mean(s$price, w), tolerance = 1e-9)
+  expect_equal(r$year, 2024L)
+  s <- lifewatt:::.state_utility_rows("FL", 2024)
+  expect_gt(nrow(s), 2L)
+  expect_equal(r$price, stats::weighted.mean(s$price, s$cus), tolerance = 1e-9)
+  expect_equal(r$price_min, min(s$price))
+  expect_equal(r$price_max, max(s$price))
+  expect_equal(r$n_utility, nrow(s))
+  ## 不变量：客户加权均值必落在 min/max 之间（W0 的 A3 判据，单州版本）
+  expect_true(r$price_min <= r$price && r$price <= r$price_max)
   expect_equal(r$regime, "observed")
   expect_false(r$provisional)
-  expect_equal(r$mapping_vintage, "2024")
-  expect_equal(r$equal_fallbacks, 0L)
+  expect_true(is.na(r$degraded_from))     # 不再有 ZIP 降级可声明
+  expect_true(is.na(r$mapping_vintage))   # 州年价不经过任何映射
+  expect_match(r$confidence_tier, "^B:")
 })
 
-test_that("A1 coverage columns expose missing utilities (anchor: 28657 @2024)", {
-  r <- lifewatt:::.zip_annual_price("28657", 2024)
-  expect_equal(r$n_mapped, 7L)
-  expect_equal(r$n_priced, 6L)
-  expect_true(grepl("Tennessee Valley", r$missing_utilities))
-  expect_true(r$price > 5 && r$price < 25)
+test_that("A1 state price reproduces the shipped state annual table", {
+  agg <- utils::read.csv(system.file("extdata", "eia861_state_annual.csv.gz", package = "lifewatt"),
+                         stringsAsFactors = FALSE)
+  for (y in c(2023L, 2024L, 2025L)) {
+    for (st in c("FL", "CA", "TX", "DC", "MA", "AK", "NC")) {
+      got <- lifewatt:::.state_annual_price(st, y)$price
+      want <- agg$price[agg$state == st & agg$year == y]
+      expect_equal(got, want, tolerance = 1e-9, label = paste(st, y))
+    }
+  }
 })
 
 test_that("A1 vendor boundary: final years only, 2026 early vintage refused", {
-  expect_error(lifewatt:::.zip_annual_price("32601", 2026),
+  expect_error(lifewatt:::.state_annual_price("FL", 2026),
                "2026 early vintage intentionally not vendored", fixed = TRUE)
-  expect_error(lifewatt:::.zip_annual_price("32601", 2022), "No vendored EIA-861", fixed = TRUE)
-  expect_error(lifewatt:::.zip_annual_price("99999", 2024), "No electric utility record", fixed = TRUE)
+  expect_error(lifewatt:::.state_annual_price("FL", 2022), "No vendored EIA-861", fixed = TRUE)
+  expect_error(lifewatt:::.state_annual_price("ZZ", 2024), "Unknown state", fixed = TRUE)
+  expect_error(lifewatt:::.state_annual_price("FL", c(2024, 2025)), "exactly one", fixed = TRUE)
+  ## ZIP 形状在 A1 层同样被指名拒绝
+  expect_error(lifewatt:::.state_annual_price("32601", 2024), "looks like a ZIP code", fixed = TRUE)
 })
 
-test_that("annual ZIP price equals an independent recompute from the shipped slim tables", {
-  map <- lifewatt:::.open_map()
+test_that("the EIA state-adjustment pseudo-utility never enters price, min, max or n_utility", {
   slim <- lifewatt:::.annual_slim()
-  share <- utils::read.csv(system.file("extdata", "zip_utility_share_slim.csv.gz", package = "lifewatt"),
-                           colClasses = c(zip = "character", eiaid = "character"))
-  recompute <- function(zip, year) {
-    m <- unique(map[map$zip == zip, c("eiaid", "state")])
-    s <- slim[slim$year == year & is.finite(slim$price) & slim$price > 0, ]
-    j <- merge(m, s[, c("eiaid", "state", "price", "cus")], by = c("eiaid", "state"))
-    # 合约：多 utility 时首选 ZIP 内人口份额（在已定价 utility 间归一），
-    # 无份额或份额全 0 时回退当年 residential customers（缺失回退等权 1）
-    sh <- share[share$zip == zip, ]
-    w <- if (nrow(j) > 1L && nrow(sh) > 0L) sh$pop_share[match(j$eiaid, sh$eiaid)] else NULL
-    if (!is.null(w)) w[is.na(w)] <- 0
-    if (is.null(w) || sum(w) == 0) w <- ifelse(is.finite(j$cus) & j$cus > 0, j$cus, 1)
-    stats::weighted.mean(j$price, w)
-  }
-  for (z in c("32601", "28657", "99501", "01002")) {
-    for (y in c(2023, 2024, 2025)) {
-      got <- lifewatt:::.zip_annual_price(z, y)$price
-      expect_equal(got, recompute(z, y), tolerance = 1e-9, label = paste(z, y))
+  adj <- slim[slim$eiaid == "99999", ]
+  expect_gt(nrow(adj), 0L)
+  checked <- 0L
+  for (st in unique(adj$state)) {
+    for (y in c(2023L, 2024L, 2025L)) {
+      if (!nrow(adj[adj$state == st & adj$year == y, ])) next
+      s <- lifewatt:::.state_utility_rows(st, y)
+      if (nrow(s) == 0L) next
+      expect_false("99999" %in% s$eiaid, label = paste(st, y))
+      checked <- checked + 1L
     }
   }
+  expect_gt(checked, 0L)
 })
