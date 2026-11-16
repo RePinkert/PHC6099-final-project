@@ -1,15 +1,9 @@
-test_that("multi-utility weighting only selects the state, and the note says so", {
+test_that("a ZIP selects the state only, and nothing downstream is weighted by it", {
   zs <- lifewatt:::.zip_state(anchor_zip_multi)
   expect_match(zs$note, "selects the state only", fixed = TRUE)
   expect_match(zs$note, "not a zip-weighted blend", fixed = TRUE)
-  # customers vs equal weighting resolves the same state: the weights never reach the state value
-  map <- lifewatt:::.open_map()
-  n_by_zip <- tapply(map$eiaid, map$zip, function(e) length(unique(e)))
-  multi <- names(n_by_zip)[n_by_zip > 1L]
-  set.seed(6099)
-  for (z in sample(multi, 50L)) {
-    expect_equal(lifewatt:::.zip_state(z)$state, lifewatt:::.zip_state(z, "equal")$state, label = z)
-  }
+  # W0：ZIP 内权重概念已删除；任何 ZIP 只解析到州
+  expect_equal(zip_to_state(anchor_zip_multi)$state, "NC")
   r <- lifewatt:::.price_at(anchor_zip_fl, "2026-07")
   d <- lifewatt:::.monthly_cache()
   expect_equal(r$price, d$price[d$state == "FL" & d$period == "2026-07"])

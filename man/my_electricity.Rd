@@ -28,7 +28,7 @@ columns, C1 disconnection mechanism columns (per-1k rates, Form EIA-112
 }
 \description{
 Energy-side view of the \code{\link[=expected_life_loss]{expected_life_loss()}} machinery: the price estimate at
-\code{time} (observed B1 state price up to 2026-07, phaseB triplet forecast afterwards),
+\code{time} (observed B1 state price up to 2026-07, LSTM forecast afterwards),
 with \code{bill} treated as Bayesian evidence (descriptive by itself; posterior when
 \code{usage} is also supplied).
 }

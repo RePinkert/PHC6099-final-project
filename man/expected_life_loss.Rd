@@ -38,7 +38,7 @@ mapping_vintage/provisional), C1 disconnection mechanism columns
 }
 \description{
 Returns the electricity-price estimate at a time point (observed B1 state price for
-months up to 2026-07, phaseB triplet forecast afterwards), combined with the user
+months up to 2026-07, LSTM forecast afterwards), combined with the user
 bill as Bayesian evidence and (optionally) a life-expectancy loss estimate.
 Without \code{delta_le} the loss columns are withheld: no sourced US ZIP-level
 price-to-life-expectancy elasticity exists yet (HANDOVER quarantine contract,

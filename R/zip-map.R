@@ -1,6 +1,11 @@
-# A2 (OpenEI 2024 vintage, CC-BY-4.0) ZIP -> utility -> state resolver.
-# 阶段C exp#31 假设：等权；exp#36 起 customers 加权为默认（A1 客户数优先、缺失回退等权并记 note）。
-# cross-state 事实：A2 2024 数据中不存在跨州多 utility 的 zip（实测 15331 个多 utility zip 全部同州）。
+# A2 (OpenEI 2024 vintage, CC-BY-4.0) ZIP -> state resolver.
+#
+# W0 起（2026-11）：**州是这个文件唯一被使用的产物**。
+# v1 的 `.zip_state()` 还做了一件额外的事——用客户数（或等权）在 ZIP 的多个 utility 间
+# 加权，用来"选州"。但 A2 2024 中不存在跨州多 utility 的 ZIP（实测 15,331 个多 utility ZIP
+# 全部同州），所以这套权重从未改变过任何下游数值；它只增加了三样东西：一份需要随包的
+# 人口份额表、一个从未被验证的重叠裁决规则、以及一个会让读者以为"ZIP 级加权"存在的列。
+# 这些在 W0 一并删除，ZIP 只剩"查州"一个用途，对外入口是 `zip_to_state()`。
 
 .open_map <- local({
   m <- NULL
@@ -16,6 +21,7 @@
   }
 })
 
+## 严格归一化：5 位数字（前导零必须显式）或 ZIP+4；歧义形状拒绝，不静默改写
 .zip5 <- function(zip) {
   if (is.null(zip) || is.list(zip) || length(zip) != 1L) {
     stop("Invalid zip: expects exactly one value (5-digit ZIP or ZIP+4).", call. = FALSE)
@@ -39,6 +45,7 @@
   z
 }
 
+## ZIP -> 该 ZIP 的 utility 记录（OpenEI 2024）；州与 utility 名都来自这里
 .zip_lookup <- function(zip) {
   m <- .open_map()
   hit <- m[m$zip == .zip5(zip), ]
@@ -49,36 +56,73 @@
   hit[order(hit$eiaid, hit$utility_name), ]
 }
 
-.zip_state <- function(zip, weights = "customers") {
+## 解析结果（内部）：州 + 该 ZIP 的 utility 记录。不做任何加权。
+.zip_resolve <- function(zip) {
   hit <- .zip_lookup(zip)
-  tb_raw <- table(hit$state)
-  if (identical(weights, "customers")) {
-    hit$cust_weight <- vapply(seq_len(nrow(hit)), function(i) {
-      w <- tryCatch(.annual_customers(hit$eiaid[i], hit$state[i]), error = function(e) NA_real_)
-      if (is.finite(w) && w > 0) w else NA_real_
-    }, numeric(1))
-    n_fallback <- sum(is.na(hit$cust_weight))
-    hit$cust_weight[is.na(hit$cust_weight)] <- 1
-    scheme <- sprintf("customers (%d equal fallback)", n_fallback)
-  } else if (identical(weights, "equal")) {
-    hit$cust_weight <- rep(1, nrow(hit))
-    scheme <- "equal"
-  } else {
-    stop(sprintf("Unknown weight scheme: %s (expects 'customers' or 'equal').", weights), call. = FALSE)
+  st <- unique(hit$state)
+  if (length(st) != 1L) {
+    stop(sprintf("ZIP %s maps to %d states in the OpenEI 2024 mapping; refusing to pick one.",
+                 .zip5(zip), length(st)), call. = FALSE)
   }
-  wt <- tapply(hit$cust_weight, hit$state, sum)
-  st <- names(wt)[which.max(wt)]
+  list(zip = .zip5(zip), state = st, n_utility = nrow(hit),
+       utilities = hit, mapping_vintage = "2024")
+}
+
+#' State of a US ZIP code
+#'
+#' `lifewatt` prices and life-expectancy estimates are state-level: the only
+#' free, nationally complete residential electricity price data are published by
+#' utility (EIA-861) and by state (EIA-861M), and no source publishes a realised
+#' average price per ZIP code. `zip_to_state()` is therefore the only ZIP-facing
+#' entry point of the price layer: it maps a ZIP to the state that serves it, and
+#' every function that reports a price takes that state directly.
+#'
+#' This is a lookup, not an estimate. No price, no interval and no weighting
+#' depends on the ZIP: every ZIP in a state returns identical state-level values.
+#' The returned `n_utility` is the number of utilities the OpenEI 2024 mapping
+#' assigns to the ZIP, reported because it is the only ZIP-specific fact the
+#' mapping carries.
+#'
+#' @param zip A character or numeric US ZIP code. Five digits are required
+#'   (leading zeros must be written out, `"01002"`); ZIP+4 and 9-digit forms are
+#'   accepted and truncated, and ambiguous shapes are refused.
+#' @return A one-row data.frame with `zip` (normalised five digits), `state`
+#'   (two-letter USPS code), `mapping_vintage` (OpenEI release, `"2024"`) and
+#'   `n_utility` (utilities assigned to the ZIP by that mapping).
+#' @seealso [electricity_price()], [expected_life_loss()], [health_measure()]
+#'   (the one function that still takes a ZIP, because CDC PLACES publishes by
+#'   ZCTA).
+#' @export
+#'
+#' @examples
+#' \dontrun{
+#' zip_to_state("32601")
+#' electricity_price(zip_to_state("32601")$state, year = 2024)
+#' }
+zip_to_state <- function(zip) {
+  r <- .zip_resolve(zip)
+  data.frame(
+    zip = r$zip,
+    state = r$state,
+    mapping_vintage = r$mapping_vintage,
+    n_utility = r$n_utility,
+    stringsAsFactors = FALSE,
+    row.names = NULL
+  )
+}
+
+## 旧内部接口的过渡层：只保留 C2/C3 尚未改完的调用点需要的那几个字段。
+## 全部改完后删除。
+.zip_state <- function(zip) {
+  r <- .zip_resolve(zip)
   list(
-    state = st,
-    utilities = hit,
-    n_utility = nrow(hit),
-    weight_scheme = scheme,
-    state_share = as.numeric(wt[st]) / sum(wt),
-    mapping_vintage = "2024",
-    # 权重只用于选州；A2 中多 utility zip 全部同州，所以它从不改变下游的州级数值
-    note = if (nrow(hit) > 1L) {
-      sprintf(paste0("multi-utility zip; %s weighting selects the state only ",
-                     "(value is the state series, not a zip-weighted blend)"), scheme)
+    state = r$state,
+    utilities = r$utilities,
+    n_utility = r$n_utility,
+    mapping_vintage = r$mapping_vintage,
+    note = if (r$n_utility > 1L) {
+      sprintf(paste0("multi-utility zip (%d utilities); the zip selects the state only ",
+                     "(value is the state series, not a zip-weighted blend)"), r$n_utility)
     } else {
       ""
     }
