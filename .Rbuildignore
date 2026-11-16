@@ -6,3 +6,5 @@
 ^data-raw$
 ^results\.tsv$
 ^\.git$
+
+^model_traning/candidates$
