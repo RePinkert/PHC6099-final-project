@@ -1,20 +1,21 @@
 Package: lifewatt
-Title: Environmental Justice Indicators by US ZIP Code
+Title: Environmental Justice Indicators by US State and ZCTA
 Version: 0.0.0.9000
 Authors@R: 
     person("Your", "Name", , "you@example.com", role = c("aut", "cre"))
-Description: Provides ZIP-code-level access to environmental justice
-    indicators, including area-average residential electricity prices
-    (observed EIA-861 annual and state monthly series with a validated
-    forecast beyond the observed window), their year-over-year and
-    month-over-month trends, and bill-based price evidence. Includes an
-    expected life-expectancy loss view anchored to published national life
-    tables, with any life-expectancy translation declared as a sensitivity
-    parameter until a sourced elasticity exists, and a synthetic
-    life-expectancy estimate built from state mortality rates whose assumptions
-    are declared in the output, and ZCTA-level adult health estimates from the
-    CDC PLACES 2025 release (crude prevalence with 95% confidence limits for
-    the 2023 BRFSS measures).
+Description: Provides environmental justice indicators at the granularity each
+    source publishes: state-level residential electricity prices (observed
+    EIA-861 annual and EIA-861M monthly series, with a validated forecast beyond
+    the observed window) and their year-over-year and month-over-month trends,
+    bill-based price evidence, an expected life-expectancy loss view anchored to
+    published national life tables (with any life-expectancy translation
+    declared as a sensitivity parameter until a sourced elasticity exists), and
+    a synthetic life-expectancy estimate built from state mortality rates whose
+    assumptions are declared in the output; plus ZCTA-level adult health
+    estimates from the CDC PLACES 2025 release (crude prevalence with 95%
+    confidence limits for the 2023 BRFSS measures). No realised average
+    residential price is published per ZIP code, so a ZIP is resolved to its
+    state with 'zip_to_state()' rather than priced directly.
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)

@@ -3,12 +3,21 @@
 <!-- badges: start -->
 <!-- badges: end -->
 
-`lifewatt` turns a US ZIP code into environmental justice indicators:
-residential electricity price estimates (observed and forecast) with YoY / MoM
-trends, bill evidence, an expected life-expectancy loss view anchored to
-published national life tables, a synthetic life-expectancy estimate built from
-state mortality rates (explicitly labeled, fully assumption-declared), and
-CDC PLACES adult health prevalence for the ZCTA that matches the ZIP.
+`lifewatt` answers questions about a place at the granularity each source
+actually publishes:
+
+- **By state** — residential electricity price (observed 2023-2025 and forecast
+  through 2026-12) with YoY / MoM trends, bill evidence, an expected
+  life-expectancy loss view anchored to published national life tables, and a
+  synthetic life-expectancy estimate built from state mortality rates
+  (explicitly labeled, fully assumption-declared). No source publishes a
+  realised average residential price per ZIP code, so this layer takes a state;
+  `zip_to_state()` resolves a ZIP to its state.
+- **By ZCTA** — CDC PLACES adult health prevalence for the ZCTA that matches a
+  ZIP code. This is the one interface that still takes a ZIP.
+
+The package does not synthesise a ZIP-level price: every ZIP in a state would
+return the same number, so the signature says state instead.
 
 ## Installation
 
@@ -31,32 +40,35 @@ slices, and `health_measure` landed as its own commit after them.
 ```r
 library(lifewatt)
 
-# observed price (EIA-861 ZIP-level annual, customer-weighted)
-electricity_price("32601", year = 2024)
+# a ZIP only ever selects a state; this is the only ZIP-facing lookup
+zip_to_state("32601")            # zip / state / mapping_vintage / n_utility
+
+# observed annual price, state-level (EIA-861, customer-weighted)
+electricity_price("FL", year = 2024)
 
 # state monthly series (B1 cache, 2023-01 .. 2026-07; EIA-preliminary months flagged provisional)
-electricity_price("32601", period = "mom")
+electricity_price("FL", period = "mom")
 
 # trend views
-electricity_price_trend("32601", period = "yoy")
-electricity_price_trend("32601", period = "mom")
+electricity_price_trend("FL", period = "yoy")
+electricity_price_trend("FL", period = "mom")
 
 # price at a time point + bill as Bayesian evidence
-my_electricity("32601", bill = 180, time = "2026-12")
-my_electricity("32601", bill = 180, usage = 1200, time = "2026-12")
+my_electricity("FL", bill = 180, time = "2026-12")
+my_electricity("FL", bill = 180, usage = 1200, time = "2026-12")
 
 # expected life-expectancy loss view (delta_le is a declared sensitivity
 # parameter, not a sourced elasticity; loss columns are withheld without it)
-expected_life_loss("32601", "2026-07")
-expected_life_loss("32601", "2026-12", bill = 180, usage = 1200)
-expected_life_loss("32601", "2026-09", delta_le = 0.01)
+expected_life_loss("FL", "2026-07")
+expected_life_loss("FL", "2026-12", bill = 180, usage = 1200)
+expected_life_loss("FL", "2026-09", delta_le = 0.01)
 
 # synthetic life expectancy (mortality-based D1b/D2 sensitivity synthesis;
 # estimate_type labels it -- not an NCHS-published subnational value)
-life_expectancy("32601")
-life_expectancy("32601", quarter = "2024Q4")
-life_expectancy_trend("32601", period = "yoy")
-life_expectancy_trend("32601", period = "qoq")
+life_expectancy("FL")
+life_expectancy("FL", quarter = "2024Q4")
+life_expectancy_trend("FL", period = "yoy")
+life_expectancy_trend("FL", period = "qoq")
 
 # adult health estimates for the ZCTA (CDC PLACES 2025 release, BRFSS 2023;
 # downloaded live, so this is the one call that needs the internet)
@@ -64,51 +76,58 @@ health_measure("32601")
 health_measure("32601", measure = c("DIABETES", "BPHIGH"))
 ```
 
+Price and life-expectancy functions take a two-letter USPS code or a full state
+name; a ZIP code is refused by name and the error points at `zip_to_state()`.
 Every row carries provenance columns (`source`, `level`, `degraded_from`,
 `mapping_vintage`, `provisional`) and, where assumptions are declared, a
-`sensitivity_assumption` column. Prices are state-level estimates for the
-utility territory of the ZIP (OpenEI 2024 mapping); months EIA still marks
-Preliminary (2026-01 onward in the shipped vintage) are flagged provisional. Months after 2026-07 are served by the LSTM
-price forecast (`fit_as_of = 2026-07`), through 2026-12 — times beyond the
-declared window are refused. ZIP inputs must be 5 digits (leading zeros
-required) or ZIP+4; ambiguous shapes are rejected, never silently rewritten.
+`sensitivity_assumption` column. `degraded_from` is `NA` on every price and
+life-expectancy row: nothing is degraded from a ZIP any more, because nothing
+claims ZIP granularity. Months EIA still marks Preliminary (2026-01 onward in
+the shipped vintage) are flagged provisional. Months after 2026-07 are served by
+the LSTM price forecast (`fit_as_of = 2026-07`), through 2026-12 — times beyond
+the declared window are refused.
 
 ## Granularity and confidence
 
-Only the annual price reaches the ZIP itself: one utility's price for a
-single-utility ZIP, or a population-share blend of several. Everything else is
-coarser or modeled, and each row says which through `confidence_tier`:
+Every price and life-expectancy row is **state-level**; the health rows are
+**ZCTA-level**. Nothing is observed at ZIP granularity, so no interface returns
+tier A:
 
 | tier | meaning | where |
 |---|---|---|
-| A | observed at the reported granularity | annual price, single-utility ZIP |
-| B | observed, but coarser than the ZIP or blended | monthly price (state); annual price of a multi-utility ZIP |
+| A | observed at the reported granularity | **no member**: the package has no ZIP-level observation |
+| B | observed, but coarser than the ZIP | annual and monthly price (state), price trends |
 | C | modeled or synthetic | forecast months, `life_expectancy()`, `health_measure()` |
 
-Two limits are worth stating plainly:
+**What "state-level" costs, stated in the output.** The annual row carries the
+customer-weighted mean of the state's EIA-861 utility prices, plus `price_min`,
+`price_max` and `n_utility` for that same set. The gap between a ZIP's own
+utility price and the state mean is the price of the simplification: measured on
+the shipped tables it is **7.5% at the median and 25.8% at p90**
+(`model_traning/HANDOVER_confidence.md`, layer L1). `within_state_sd` (the
+customer-weighted spread of utility prices in the state) carries the same
+information as one number.
 
-- **Monthly and forecast prices are the state value.** Every ZIP in a state gets
-  the same number. The utility weights in the ZIP mapping only pick the state, and
-  in the OpenEI 2024 mapping no ZIP straddles a state line, so the weighting never
-  changes the price. `within_state_sd` (customer-weighted spread of EIA-861 utility
-  prices in the state) shows how far a ZIP's real price can typically sit from the
-  state value.
-- **Annual multi-utility prices are weighted by each utility's 2020 population
-  share inside the ZIP.** Every populated census block in the ZCTA is placed in
-  the HIFLD retail service territories that contain it (only utilities the OpenEI
-  mapping assigns to the ZIP count). The shares cover 14,661 of the 15,331
-  multi-utility ZIPs; the rest fall back to system-wide residential customers, and
-  `weight_basis` says which applied. Before this, a large utility touching the edge
-  of a ZIP could dominate: 32608 was 87% Duke Energy Florida and priced at 16.26
-  cents/kWh; it is now a Clay Electric / GRU split at 13.95.
-- **The shares depend on how overlapping territories are resolved.** HIFLD draws
-  many cooperatives and large investor-owned utilities as whole counties, so they
-  overlap the precisely drawn municipal territories. An overlapping block goes to
-  the smallest territory (the most specific boundary). Across ZIPs, a median 24%
-  of the population sits in overlaps, and 4,318 ZIPs are entirely in overlap;
-  `share_overlap_frac` reports this per ZIP, and the shipped table keeps an
-  equal-split alternative (`pop_share_equal`) for sensitivity checks. Read the
-  point estimate together with `price_min` / `price_max`.
+**The granularity loss can exceed the forecast band.** Across states, the ratio
+of `within_state_sd` to the h = 1 forecast half-width has a median of 1.5-1.6
+and exceeds 1 in 80-88% of states: at monthly resolution, which utility serves
+the ZIP matters more than model uncertainty. The state value is reported with
+that ratio available, not behind it.
+
+**Bill evidence is the only household-level measurement.** With `bill` and
+`usage`, `my_electricity()` and `expected_life_loss()` report a household
+effective price (`bill * 100 / usage`) and, in the forecast regime, an
+inverse-variance posterior against the state price as prior. That is a different
+estimand from the state average, and the row's `notes` says which one it holds.
+
+**Why the ZIP-level blend was removed** (2026-11). The package used to weight a
+ZIP's utilities by their 2020 population share inside the ZIP. That weighting
+never reached a downstream number — in the OpenEI 2024 mapping no ZIP straddles
+a state line, so the blend could only ever pick the state — while it did import
+an unvalidated rule for overlapping service territories (an overlapping block
+resolved to the smallest territory put essentially all of ZIP 32601's and
+32608's population in overlaps). The table, the assembler and the weighting are
+gone; `zip_to_state()` keeps the one fact the mapping carries.
 
 ## Price forecast: what the validation shows and what it does not
 
@@ -238,6 +257,11 @@ but not always, cover the same area; `level = "zcta"` and
 
 ## Scope notes
 
+- **Breaking change (2026-11)**: the price and life-expectancy interfaces take a
+  state instead of a ZIP; `zip_to_state()` is the only ZIP lookup;
+  `inst/extdata/zip_utility_share_slim.csv.gz` and the ZIP population-share blend
+  are gone; `degraded_from` and `mapping_vintage` are `NA` on state-level rows.
+  See `NEWS.md`.
 - `delta_le` has no sourced elasticity yet (as of 2026-11-18 contract); it is a
   caller-supplied sensitivity parameter and the output labels it as such.
 - EIA-112 disconnection mechanism data covers 2024 only.

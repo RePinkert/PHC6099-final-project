@@ -1,5 +1,27 @@
 # lifewatt 0.0.0.9000
 
+* **BREAKING：价格与寿命层改为州级，ZIP 只用于查州（2026-11）**：
+  随包不再合成 ZIP 级电价。免费的、全国覆盖的、且是**实收均价**的 ZIP 级住宅电价不存在
+  （OpenEI 的 ZIP 查询官方写明是 utility 级；EIA-826 的 utility×月数据停在 2016），
+  所以 ZIP 过去只被用来选州，而签名却在承诺 ZIP 精度——同一个州的任意两个 ZIP 返回同一个数。
+  - 新增导出 `zip_to_state(zip)`：唯一的 ZIP 入口，返回 `zip` / `state` / `mapping_vintage` / `n_utility`。
+  - **六个函数改收 `state`**：`electricity_price()`、`electricity_price_trend()`、
+    `expected_life_loss()`、`my_electricity()`、`life_expectancy()`、`life_expectancy_trend()`。
+    传 ZIP 会**指名拒绝**并指路 `zip_to_state()`。`health_measure()` 仍收 ZIP（PLACES 按 ZCTA 发布），
+    传州码时会被明确告知这个不对称。
+  - 年度层：`price` = 该州居民 utility 的客户加权均价；`price_min` / `price_max` / `n_utility`
+    改述为**该州**的描述性范围（与 `price` 同源，排除 EIA 99999 调整伪 utility）。
+  - 删除列：`zip`、`utilities`、`weight_basis`、`share_overlap_frac`、`n_mapped`、`n_priced`、
+    `min_weight`、`max_weight`、`equal_fallbacks`、`missing_utilities`、`weight_note`。
+  - `degraded_from` 与 `mapping_vintage` 在州级行恒为 `NA`：没有降级可声明，也没有映射被应用。
+  - **不再有 tier A**：包内已无任何 ZIP 级观测。
+  - 删除资产 `inst/extdata/zip_utility_share_slim.csv.gz`（339 KB）与
+    `data-raw/assemble_zip_utility_share.R`；`inst/extdata` 1.01 MiB → 0.69 MiB。
+  - 审计风险 **R2（HIFLD 重叠裁决）与 R10（映射 vintage 漂移）随之消除**。
+  - 代价写在输出里，不藏在注释里：用州值代表 ZIP，中位 **7.5%** / p90 **25.8%**（L1 实测）。
+    `within_state_sd` 与 `price_min`/`price_max` 是这一行的声明方式。
+  - 测试：1017 PASS / 0 FAIL / 0 SKIP（`NOT_CRAN=true` 下快照与 `skip_on_cran` 测试现在本地也跑，见审计 R7）。
+
 * **置信度目标的第一轮自主迭代（研究分支 `model_training`，未发货）**：
   新增"无嵌套"的四年置信度协议与区间构造库，并把**置信度**（而不是点误差）当作训练目标。
   - `R/conf-protocol.R`、`R/conf-intervals.R`、`R/conf-harness.R`：包内内部函数。

@@ -13,40 +13,49 @@ knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
 
 ## Overview
 
-`lifewatt` maps a US ZIP code to environmental justice indicators:
+`lifewatt` reports environmental justice indicators at the granularity each
+source actually publishes:
 
-- residential electricity price estimates (observed EIA-861 annual ZIP-level
-  and EIA B1 state monthly series) with YoY / MoM trends;
-- bill-as-evidence price views;
-- an expected life-expectancy loss view anchored to published national life
-  tables (NCHS), with any life-expectancy translation declared as a
-  caller-supplied sensitivity parameter;
-- a synthetic life-expectancy estimate (state mortality rates + national
-  life-table anchor; every assumption declared in `sensitivity_assumption`).
+- **by state** — residential electricity price (observed EIA-861 annual and EIA
+  B1 monthly series) with YoY / MoM trends, bill-as-evidence price views, and an
+  expected life-expectancy loss view anchored to published national life tables
+  (NCHS), where any life-expectancy translation is a caller-supplied sensitivity
+  parameter;
+- **by state** — a synthetic life-expectancy estimate (state mortality rates +
+  national life-table anchor; every assumption declared in
+  `sensitivity_assumption`);
+- **by ZCTA** — CDC PLACES adult health prevalence for the ZCTA that matches a
+  ZIP code.
+
+No source publishes a realised average residential price per ZIP code, so the
+price layer takes a state and `zip_to_state()` resolves a ZIP to its state.
 
 ## Workflow
 
 ```{r eval = FALSE}
 library(lifewatt)
 
-# observed price (ZIP-level annual, customer-weighted)
-electricity_price("32601", year = 2024)
+# a ZIP only ever selects a state
+zip_to_state("32601")            # zip / state / mapping_vintage / n_utility
+
+# observed annual price, state-level (customer-weighted across the state's utilities)
+electricity_price("FL", year = 2024)
 
 # state monthly series (2023-01 .. 2026-07; EIA-preliminary months flagged)
-electricity_price("32601", period = "mom")
+electricity_price("FL", period = "mom")
 
 # trends
-electricity_price_trend("32601", period = "yoy")
-electricity_price_trend("32601", period = "mom")
+electricity_price_trend("FL", period = "yoy")
+electricity_price_trend("FL", period = "mom")
 
 # price + bill evidence (bill is Bayesian evidence, not a required input)
-my_electricity("32601", bill = 180, time = "2026-12")
-my_electricity("32601", bill = 180, usage = 1200, time = "2026-12")
+my_electricity("FL", bill = 180, time = "2026-12")
+my_electricity("FL", bill = 180, usage = 1200, time = "2026-12")
 
 # expected life-expectancy loss view
-expected_life_loss("32601", "2026-07")
-expected_life_loss("32601", "2026-12", bill = 180, usage = 1200)
-expected_life_loss("32601", "2026-09", delta_le = 0.01)
+expected_life_loss("FL", "2026-07")
+expected_life_loss("FL", "2026-12", bill = 180, usage = 1200)
+expected_life_loss("FL", "2026-09", delta_le = 0.01)
 
 # adult health estimates for the ZCTA (CDC PLACES 2025 release, BRFSS 2023;
 # downloaded live from data.cdc.gov on each call)
@@ -54,17 +63,31 @@ health_measure("32601")
 health_measure("32601", measure = c("DIABETES", "BPHIGH"))
 ```
 
+Price and life-expectancy functions accept a two-letter USPS code or a full
+state name; a ZIP code is refused by name and the error points at
+`zip_to_state()`. `health_measure()` is the exception: CDC PLACES publishes by
+ZCTA, so it needs a ZIP and says so when handed a state.
+
 ## Provenance and honesty contract
 
 Every returned row carries provenance columns (`source`, `level`,
-`degraded_from`, `mapping_vintage`, `provisional`). Prices are state-level
-estimates for the utility territory the OpenEI 2024 mapping assigns to the ZIP.
+`degraded_from`, `mapping_vintage`, `provisional`). On price and
+life-expectancy rows `level` is always `"state"` and `degraded_from` is always
+`NA`: nothing is degraded from a ZIP, because the interface no longer accepts
+one. `health_measure()` rows are `level = "zcta"` with `degraded_from = "zip"`,
+because a ZIP is treated as the ZCTA with the same five digits.
+
 Months EIA still marks Preliminary are flagged provisional; months after 2026-07
 are served by the LSTM price forecast (`fit_as_of = 2026-07`).
 `health_measure()` is the exception on provenance *epochs* rather than on
 columns: it is the only interface that is not served from a shipped snapshot, so
 its `provisional` flag is always `FALSE` while the bytes come from a live
 query.
+
+The annual row also carries `price_min`, `price_max` and `n_utility` for the
+state's utilities, and every state-level row carries `within_state_sd`. Those
+three numbers are how the package states, per row, how far the state value can
+sit from a particular ZIP.
 
 `delta_le` is a declared sensitivity parameter, not a sourced elasticity: the
 output labels it in a `sensitivity_assumption` column. Without `delta_le` the
@@ -76,7 +99,7 @@ The mortality source is quarterly (NCHS VSRR provisional), so trend periods are
 `"yoy"` / `"qoq"` — `"mom"` is refused honestly.
 
 ```{r eval = FALSE}
-life_expectancy("32601")
-life_expectancy("32601", quarter = "2024Q4")
-life_expectancy_trend("32601", period = "yoy")
+life_expectancy("FL")
+life_expectancy("FL", quarter = "2024Q4")
+life_expectancy_trend("FL", period = "yoy")
 ```
