@@ -23,7 +23,8 @@
   }
 })
 
-.price_history_wide <- local({
+## 随包价格史整表（含 data_status / imputed）：对外的价格特征与滞后矩阵也读它
+.price_history_frame <- local({
   cached <- NULL
   function() {
     if (!is.null(cached)) return(cached)
@@ -32,7 +33,19 @@
       stop("price history not shipped: inst/extdata/price_history_slim.csv.gz missing.",
            call. = FALSE)
     }
-    d <- utils::read.csv(path, stringsAsFactors = FALSE)
+    d <- utils::read.csv(path, colClasses = c(state = "character", period = "character",
+                                               price = "numeric", imputed = "integer",
+                                               data_status = "character"))
+    cached <<- d
+    d
+  }
+})
+
+.price_history_wide <- local({
+  cached <- NULL
+  function() {
+    if (!is.null(cached)) return(cached)
+    d <- .price_history_frame()
     sts <- sort(unique(d$state))
     pers <- sort(unique(d$period))
     m <- matrix(NA_real_, length(sts), length(pers), dimnames = list(sts, pers))

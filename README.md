@@ -50,6 +50,19 @@ electricity_price("FL", period = "mom")
 electricity_price_trend("FL", period = "yoy")
 electricity_price_trend("FL", period = "mom")
 
+# plain-language price features for the last 12 months: the price itself, the
+# typical price over 3/6/12 months, the change against last month and against
+# the same month a year earlier, the recent trend, and where the month sits
+# against the state's annual price (all observed, cents/kWh and %)
+price_features("FL")
+price_features("FL", period = "2026-07")
+price_features("FL", from = "2024-01", to = "2024-12")
+
+# the same series with its previous months side by side, for plotting or for
+# building your own model: price_now, price_1m_ago ... price_12m_ago
+lag_matrix("FL")
+lag_matrix(c("FL", "NC"), lags = 0:6)
+
 # price at a time point + bill as Bayesian evidence
 my_electricity("FL", bill = 180, time = "2026-12")
 my_electricity("FL", bill = 180, usage = 1200, time = "2026-12")
@@ -79,7 +92,10 @@ Every row carries provenance columns (`source`, `level`, `degraded_from`,
 `mapping_vintage`, `provisional`) and, where assumptions are declared, a
 `sensitivity_assumption` column. `degraded_from` is `NA` on every price and
 life-expectancy row: nothing is degraded from a ZIP any more, because nothing
-claims ZIP granularity. Months EIA still marks Preliminary (2026-01 onward in
+claims ZIP granularity. `price_features()` and `lag_matrix()` read the shipped
+price panel directly (2010-01..2026-07) and are observed-only; they carry the
+provenance columns and the per-month provisional flag like every other row.
+Months EIA still marks Preliminary (2026-01 onward in
 the shipped vintage) are flagged provisional. Months after 2026-07 are served by
 the LSTM price forecast (`fit_as_of = 2026-07`), through 2026-12 — times beyond
 the declared window are refused.
@@ -259,6 +275,12 @@ but not always, cover the same area; `level = "zcta"` and
   state instead of a ZIP; `inst/extdata/zip_utility_share_slim.csv.gz` and the ZIP
   population-share blend are gone; `degraded_from` and `mapping_vintage` are
   `NA` on state-level rows. See `NEWS.md`.
+- **New (2026-11-17)**: `price_features()` and `lag_matrix()` are released as
+  exports. Both were design-draft blueprints that had never shipped; the
+  computation was already in the package (the LSTM input window), so this is
+  the same numbers in plain units — no z-scores, no masks. They are observed
+  only: the forecast and its interval stay in `expected_life_loss()` /
+  `my_electricity()`.
 - **Breaking change (2026-11-17)**: `zip_to_state()` is deleted — respondents know
   their state, and the price layer was state-level anyway. With it go the A2
   OpenEI ZIP->state mapping asset (`inst/extdata/openei_zip2state_slim.csv.gz`,

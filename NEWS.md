@@ -1,5 +1,21 @@
 # lifewatt 0.0.0.9000
 
+* **解冻 `price_features()` / `lag_matrix()`（2026-11-17）**：设计稿里这两个函数一直挂在
+  "未落地"清单上（滚动/滞后统计内联在价格与 LE 两个 LSTM 前向里）。算力本来就在包里，
+  这次只是把同一批计算以**普通用户看得懂的单位**交还给用户：导出 **7 → 9**。
+  - `price_features(state, period, from, to)`：州级价格特征的**实测**表——
+    `price`、`avg_3m`/`avg_6m`/`avg_12m`、`change_1m`/`change_1m_pct`、
+    `change_12m`/`change_12m_pct`、`trend_12m`（每月斜率）、`annual_price` +
+    `price_vs_annual_pct`（这个月离年度价多远）。窗口不足一律 NA（不悄悄缩短），
+    `provisional` 逐月随行，单位是 cents/kWh 与 %——不出现 z-score / min-max / mask / age。
+  - `lag_matrix(states, from, to, lags)`：把过去几个月并排放——`price_now`、
+    `price_1m_ago` … `price_12m_ago`（列名即含义），随包价格史面板 2010-01..2026-07，
+    超出面板的滞后为 NA。给用户自己画图、自己建模用。
+  - 两者都**不含预测区间**：区间仍在 `expected_life_loss()` / `my_electricity()` 的
+    `price_lo`/`price_hi` 上，避免同一件事有两个口径。
+  - 测试：新增 `tests/testthat/test-price-features.R`；`audit/extract_callgraph.R` 的
+    "zip_to_state 只读映射"断言改成"无人再读已退场的 openei 映射"。
+
 * **BREAKING：`zip_to_state()` 删除（导出 8 -> 7）（2026-11-17）**：
   - **删除导出 `zip_to_state()`**：受访者知道自己的州，而价格/寿命层本来就是州级的
     （同一个州的任意两个 ZIP 返回同一个数），所以"查州"这一步没有用户价值。

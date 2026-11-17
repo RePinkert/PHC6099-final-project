@@ -8,10 +8,12 @@ test_that("public functions are exported", {
   expect_true(is.function(life_expectancy))
   expect_true(is.function(life_expectancy_trend))
   expect_true(is.function(health_measure))
+  expect_true(is.function(price_features))
+  expect_true(is.function(lag_matrix))
   expect_setequal(getNamespaceExports("lifewatt"),
                   c("electricity_price", "electricity_price_trend", "expected_life_loss",
-                    "health_measure", "life_expectancy", "life_expectancy_trend",
-                    "my_electricity"))
+                    "health_measure", "lag_matrix", "life_expectancy",
+                    "life_expectancy_trend", "my_electricity", "price_features"))
 })
 
 test_that("electricity_price dispatches to the internal layers", {
