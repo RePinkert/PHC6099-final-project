@@ -8,3 +8,4 @@
 ^\.git$
 
 ^model_traning/candidates$
+^audit$

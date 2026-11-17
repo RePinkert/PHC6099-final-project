@@ -8,6 +8,8 @@ data-raw/eia112/
 data-raw/vsrr/
 data-raw/openei/
 docs/*.html
+# doc/audit toolchain: local only, never pushed (same rule as docs/)
+audit/
 data-raw/zipshare/
 data-raw/eia861m/
 model_traning/candidates/
