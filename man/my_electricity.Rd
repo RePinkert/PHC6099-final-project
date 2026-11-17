@@ -25,7 +25,10 @@ measured state price (observed regime).}
 A one-row data.frame with the price estimate, implied usage, evidence
 columns, C1 disconnection mechanism columns (per-1k rates, Form EIA-112
 2024 State Total; NA outside 2024) and full provenance
-(source/level/degraded_from/mapping_vintage/provisional).
+(source/level/degraded_from/mapping_vintage/provisional). In the predicted
+regime the row also carries the model interval (\code{price_lo}/\code{price_hi}, with
+its \code{price_interval_basis} declaration); in the observed regime those three
+are NA because a measured month has no forecast band.
 }
 \description{
 Energy-side view of the \code{\link[=expected_life_loss]{expected_life_loss()}} machinery: the price estimate at

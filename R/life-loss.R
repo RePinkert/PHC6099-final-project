@@ -106,7 +106,10 @@
 #'   NCHS national anchor, provenance columns (source/level/degraded_from/
 #'   mapping_vintage/provisional), C1 disconnection mechanism columns
 #'   (per-1k rates, Form EIA-112 2024 State Total; NA outside 2024) and a
-#'   `sensitivity_assumption` declaration column.
+#'   `sensitivity_assumption` declaration column. In the predicted regime the row
+#'   also carries the model interval (`price_lo`/`price_hi`, with its
+#'   `price_interval_basis` declaration); in the observed regime those three are
+#'   NA because a measured month has no forecast band.
 #' @export
 #'
 #' @examples

@@ -39,12 +39,18 @@
   spread <- .within_state_spread(state, as.integer(substr(period, 1L, 4L)))
   if (period > cutoff) {
     pr <- .lstm_predict(state, period)
+    ## 区间：随包台账量的是 |r| <= abs_q85 这条带（与 price_sd 同口径）；
+    ## .lstm_predict() 里 r_q05/r_q95 那条带没有随包覆盖台账 -> 不外发，只发这一条。
+    half <- pr$.sd * stats::qnorm(0.925)   # = price * abs_q85[h]
     return(data.frame(
       state = state,
       period = period,
       price = pr$price,
       unit = "cents/kWh",
       price_sd = pr$.sd,
+      price_lo = pmax(0, pr$price - half),
+      price_hi = pr$price + half,
+      price_interval_basis = .interval_basis(),
       regime = "predicted",
       provisional = NA,
       fit_as_of = cutoff,
@@ -75,6 +81,9 @@
     price = row$price,
     unit = "cents/kWh",
     price_sd = NA_real_,
+    price_lo = NA_real_,
+    price_hi = NA_real_,
+    price_interval_basis = NA_character_,
     regime = "observed",
     provisional = row$data_status == "Preliminary",
     fit_as_of = NA_character_,

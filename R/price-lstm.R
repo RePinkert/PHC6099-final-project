@@ -287,3 +287,16 @@
   row.names(res) <- NULL
   res
 }
+
+## 区间声明（覆盖纪律：口径 · 边际 vs 联合 · 种子 · 失败率）
+## 数字全部从冻结 fit 的台账里取，不在本文件硬编码第二个真相源。
+.interval_basis <- function() {
+  f <- .price_lstm_fit()
+  cal <- as.numeric(f$coverage$calib_in_sample)
+  tr  <- as.numeric(f$coverage$transfer_early_window)
+  sprintf(paste0(
+    "abs_q85 band (|relative residual| <= abs_q85[h]); marginal, single horizon -- NOT joint over h=1..5; ",
+    "calibration window %s; coverage in-sample %.3f-%.3f, transfer window %.3f-%.3f; frozen fit seed %s; ",
+    "seed-to-seed band not shipped (measured research-side, see model_traning/conf_serving_seedband.csv)"),
+    f$calib_window, min(cal), max(cal), min(tr), max(tr), f$seed)
+}

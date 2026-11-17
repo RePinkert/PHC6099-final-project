@@ -35,7 +35,10 @@ A one-row data.frame with price/implied-usage/bill-evidence columns, the
 NCHS national anchor, provenance columns (source/level/degraded_from/
 mapping_vintage/provisional), C1 disconnection mechanism columns
 (per-1k rates, Form EIA-112 2024 State Total; NA outside 2024) and a
-\code{sensitivity_assumption} declaration column.
+\code{sensitivity_assumption} declaration column. In the predicted regime the row
+also carries the model interval (\code{price_lo}/\code{price_hi}, with its
+\code{price_interval_basis} declaration); in the observed regime those three are
+NA because a measured month has no forecast band.
 }
 \description{
 Returns the electricity-price estimate at a time point (observed B1 state price for

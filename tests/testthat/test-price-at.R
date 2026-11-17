@@ -49,6 +49,16 @@ test_that("beyond-window inputs dispatch to the predicted branch (exp#33)", {
   expect_true(is.finite(fut$price_sd) && fut$price_sd > 0)
   expect_true(is.na(fut$provisional))
   expect_equal(fut$fit_as_of, "2026-07")
+  ## 区间列与 price_sd 同口径（|r| <= abs_q85 那条带），并自带覆盖声明
+  expect_true(is.finite(fut$price_lo) && fut$price_lo > 0)
+  expect_true(is.finite(fut$price_hi) && fut$price_hi > fut$price)
+  expect_lt(fut$price_lo, fut$price)
+  expect_match(fut$price_interval_basis, "abs_q85 band", fixed = TRUE)
+  expect_match(fut$price_interval_basis, "NOT joint over h=1..5", fixed = TRUE)
+  ## 观测 regime：没有预测区间 -> NA（不是 0，也不是假的窄带）
+  obs <- lifewatt:::.price_at(anchor_state_fl, "2026-07")
+  expect_true(is.na(obs$price_lo) && is.na(obs$price_hi))
+  expect_true(is.na(obs$price_interval_basis))
   expect_error(lifewatt:::.price_at(anchor_state_fl, "2022-12"), "no record for state FL", fixed = TRUE)
 })
 
