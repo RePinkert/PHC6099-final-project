@@ -12,11 +12,11 @@ month-over-month (MoM) trends, plus a synthetic life expectancy and its
 year-over-year and quarter-over-quarter trends.
 }
 \author{
-\strong{Maintainer}: Your Name \email{you@example.com}
+\strong{Maintainer}: RePinkert \email{61274955+RePinkert@users.noreply.github.com}
 
 Authors:
 \itemize{
-  \item Your Name \email{you@example.com}
+  \item RePinkert \email{61274955+RePinkert@users.noreply.github.com}
 }
 
 }

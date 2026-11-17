@@ -2,7 +2,7 @@ Package: lifewatt
 Title: Environmental Justice Indicators by US State and ZCTA
 Version: 0.0.0.9000
 Authors@R: 
-    person("Your", "Name", , "you@example.com", role = c("aut", "cre"))
+    person("RePinkert", , , "61274955+RePinkert@users.noreply.github.com", role = c("aut", "cre"))
 Description: Provides environmental justice indicators at the granularity each
     source publishes: state-level residential electricity prices (observed
     EIA-861 annual and EIA-861M monthly series, with a validated forecast beyond
