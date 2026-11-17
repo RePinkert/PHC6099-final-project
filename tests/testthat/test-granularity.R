@@ -1,11 +1,9 @@
 # test-granularity.R —— 颗粒度与置信度声明层（W0 起：州是唯一颗粒度）
-# 钉住：①ZIP 不改变任何数值 ②州年价带 min/max 且自洽 ③within_state_sd 是独立可复算的
+# 钉住：①州是唯一颗粒度（ZIP 不再参与任何数值） ②州年价带 min/max 且自洽 ③within_state_sd 是独立可复算的
 # ④tier 只按"观测 / 模型"分，不再有 ZIP 级 A
 
-test_that("a ZIP selects the state only, and nothing downstream is weighted by it", {
-  expect_equal(zip_to_state(anchor_zip_multi)$state, "NC")
-  expect_equal(zip_to_state(anchor_zip_single)$state, "MA")
-  ## 两个不同的 ZIP 在同一州 → 同一行数值（这正是收州的原因）
+test_that("the state value is the whole answer, and no ZIP is weighted anywhere", {
+  ## 2026-11-17 起包内没有 ZIP->州 映射：同州不同 ZIP 不再产生任何差异
   a <- lifewatt:::.price_at(anchor_state_fl, "2026-07")
   b <- lifewatt:::.price_at("fl", "2026-07")
   expect_identical(a, b)

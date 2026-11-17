@@ -83,10 +83,9 @@ test_that("implausible bill / usage combinations are refused, not turned into ev
   expect_equal(r$price_meas, 15)
 })
 
-test_that("the ZIP entry point is refused and points at zip_to_state()", {
+test_that("the ZIP entry point is refused and points at the state form", {
   err <- tryCatch(expected_life_loss(anchor_zip_fl, "2026-07"), error = function(e) conditionMessage(e))
   expect_match(err, "looks like a ZIP code", fixed = TRUE)
-  expect_match(err, "zip_to_state", fixed = TRUE)
-  ## 走一遍文档承诺的路径：ZIP -> 州 -> 价格
-  expect_equal(expected_life_loss(zip_to_state(anchor_zip_fl)$state, "2026-07")$state, "FL")
+  expect_match(err, "two-letter USPS code", fixed = TRUE)
+  expect_match(err, "health_measure", fixed = TRUE)
 })

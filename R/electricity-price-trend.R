@@ -7,8 +7,7 @@
 #' monthly series (42 rows; a flagged provisional change involves at least one
 #' provisional month).
 #'
-#' Takes a state, not a ZIP code: see [electricity_price()] for why, and
-#' [zip_to_state()] to resolve a ZIP.
+#' Takes a state, not a ZIP code: see [electricity_price()] for why.
 #'
 #' @param state A two-letter USPS state code (`"FL"`) or a full state name.
 #' @param period One of `"yoy"` or `"mom"`.

@@ -34,17 +34,16 @@ cache (2023-01 to 2026-07), and months EIA marks Preliminary are provisional.
 \details{
 This function takes a state, not a ZIP code: no source publishes a realised
 average residential price per ZIP, so every ZIP in a state would return the
-same number. Use \code{\link[=zip_to_state]{zip_to_state()}} to resolve a ZIP, and read \code{price_min} /
-\code{price_max} / \code{within_state_sd} as the declared distance between the state
-value and the utilities inside it.
+same number. Read \code{price_min} / \code{price_max} / \code{within_state_sd} as the
+declared distance between the state value and the utilities inside it.
 }
 \examples{
 \dontrun{
 electricity_price("FL", year = 2024)
 electricity_price("FL", period = "mom")
-electricity_price(zip_to_state("32601")$state, year = 2024)
+electricity_price("Florida", year = 2024)
 }
 }
 \seealso{
-\code{\link[=zip_to_state]{zip_to_state()}}, \code{\link[=electricity_price_trend]{electricity_price_trend()}}, \code{\link[=my_electricity]{my_electricity()}}
+\code{\link[=electricity_price_trend]{electricity_price_trend()}}, \code{\link[=my_electricity]{my_electricity()}}
 }

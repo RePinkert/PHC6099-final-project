@@ -17,10 +17,10 @@ test_that("state codes normalise from USPS codes and full names", {
   }
 })
 
-test_that("a ZIP handed to a state argument is refused by name, and points at zip_to_state()", {
+test_that("a ZIP handed to a state argument is refused by name, and points at the state form", {
   err <- tryCatch(lifewatt:::.state_code("32601"), error = function(e) conditionMessage(e))
   expect_match(err, "looks like a ZIP code", fixed = TRUE)
-  expect_match(err, "zip_to_state", fixed = TRUE)
+  expect_match(err, "two-letter USPS code", fixed = TRUE)
   expect_match(err, "health_measure", fixed = TRUE)
   ## 数值型 ZIP 走同一条路（不能被 as.character 静默变成别的东西）
   expect_error(lifewatt:::.state_code(32601), "looks like a ZIP code", fixed = TRUE)

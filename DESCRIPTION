@@ -14,8 +14,8 @@ Description: Provides environmental justice indicators at the granularity each
     assumptions are declared in the output; plus ZCTA-level adult health
     estimates from the CDC PLACES 2025 release (crude prevalence with 95%
     confidence limits for the 2023 BRFSS measures). No realised average
-    residential price is published per ZIP code, so a ZIP is resolved to its
-    state with 'zip_to_state()' rather than priced directly.
+    residential price is published per ZIP code, so the price and
+    life-expectancy interfaces take a state and refuse a ZIP by name.
 License: MIT + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)

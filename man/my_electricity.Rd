@@ -2,14 +2,13 @@
 % Please edit documentation in R/my-electricity.R
 \name{my_electricity}
 \alias{my_electricity}
-\title{Estimated electricity situation for a ZIP code at a month}
+\title{Estimated electricity situation for a state at a month}
 \usage{
 my_electricity(state, bill = NULL, time, usage = NULL, meas_sd = 1)
 }
 \arguments{
 \item{state}{A two-letter USPS state code (\code{"FL"}) or a full state name.
-The price layer is state-level, so a ZIP is refused; resolve one with
-\code{\link[=zip_to_state]{zip_to_state()}} first.}
+The price layer is state-level, so a ZIP is refused.}
 
 \item{bill}{Optional monthly electricity bill in USD; default unset (it is evidence,
 not a required input).}

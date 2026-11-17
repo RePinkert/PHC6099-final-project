@@ -1,7 +1,7 @@
 # test-input-contracts.R —— 输入契约测试：防呆 / 防注入弹药包。
 # 原则：任何含糊或恶意输入必须被显式拒绝并给出可行动的报错，绝不静默改写。
 # W0 起有两个入口闸门，各自只认自己那一半：
-#   .zip5()       —— 5 位数字（health_measure、zip_to_state）
+#   .zip5()       —— 5 位数字（只剩 health_measure 用它按 ZCTA 查 CDC PLACES）
 #   .state_code() —— 2 字母州码或州全名（价格 / 寿命层），并指名拒绝 ZIP 形状
 # 两者都拒绝的输入（注入串）在价格侧报"Unknown state"，在健康侧报"Invalid zip"。
 
@@ -45,8 +45,6 @@ test_that("state contract: the two entry gates are not interchangeable", {
   expect_error(electricity_price(anchor_zip_fl, year = 2024), "looks like a ZIP code", fixed = TRUE)
   expect_error(life_expectancy(anchor_zip_fl), "looks like a ZIP code", fixed = TRUE)
   expect_error(life_expectancy_trend(anchor_zip_fl, period = "yoy"), "looks like a ZIP code", fixed = TRUE)
-  ## 州码 -> ZIP 层：同样指名拒绝
-  expect_error(zip_to_state("FL"), "Invalid zip", fixed = TRUE)
 })
 
 test_that("injection strings die at the entry gate, before any I/O", {

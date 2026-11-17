@@ -6,7 +6,7 @@ anchor_zip_ak <- "99501"
 anchor_zip_multi <- "28657"
 anchor_zip_single <- "01002"
 
-# W0：价格/寿命层收州，ZIP 只经 zip_to_state() 解析；这两个锚点必须互相一致
+# 价格/寿命层收州；2026-11-17 起 ZIP 不再有任何映射步骤，ZIP 锚点只服务 health_measure()
 anchor_state_fl <- "FL"
 anchor_state_ak <- "AK"
 anchor_state_nc <- "NC"

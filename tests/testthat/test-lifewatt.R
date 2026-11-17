@@ -1,4 +1,4 @@
-# test-lifewatt.R —— 对外接口面（W0：zip_to_state() 是唯一 ZIP 入口；其余收州）
+# test-lifewatt.R —— 对外接口面（2026-11-17：zip_to_state() 已删除；health_measure() 是唯一 ZIP 入口）
 
 test_that("public functions are exported", {
   expect_true(is.function(electricity_price))
@@ -8,11 +8,10 @@ test_that("public functions are exported", {
   expect_true(is.function(life_expectancy))
   expect_true(is.function(life_expectancy_trend))
   expect_true(is.function(health_measure))
-  expect_true(is.function(zip_to_state))
   expect_setequal(getNamespaceExports("lifewatt"),
                   c("electricity_price", "electricity_price_trend", "expected_life_loss",
                     "health_measure", "life_expectancy", "life_expectancy_trend",
-                    "my_electricity", "zip_to_state"))
+                    "my_electricity"))
 })
 
 test_that("electricity_price dispatches to the internal layers", {

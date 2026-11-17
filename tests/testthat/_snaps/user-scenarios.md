@@ -20,7 +20,7 @@
       tryCatch(expected_life_loss(anchor_zip_fl, "2026-07"), error = function(e) e)$
         message
     Output
-      [1] "'32601' looks like a ZIP code. This function takes a US state, because the price series is state-level. Resolve the ZIP first: zip_to_state(\"32601\")$state. For ZCTA-level health data use health_measure()."
+      [1] "'32601' looks like a ZIP code. This function takes a US state, because the price series is state-level. Use a two-letter USPS code such as 'FL' (or a full state name). For ZCTA-level health data use health_measure()."
 
 ---
 
@@ -52,13 +52,6 @@
       tryCatch(electricity_price(anchor_state_fl), error = function(e) e)$message
     Output
       [1] "Provide either year (2023-2025 annual, state-level) or period = \"mom\" (state monthly series)."
-
----
-
-    Code
-      tryCatch(zip_to_state("FL"), error = function(e) e)$message
-    Output
-      [1] "Invalid zip 'FL': expected 5 digits (leading zeros required, e.g. '01002') or ZIP+4."
 
 # scenario 11: 健康侧查糖尿病与高血压（ZCTA 原生，带 95% CI）
 

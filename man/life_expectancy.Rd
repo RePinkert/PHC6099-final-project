@@ -29,7 +29,7 @@ NCHS-published subnational life expectancy; every assumption travels in the
 }
 \details{
 Takes a state, not a ZIP code: the VSRR source is state-level, so a ZIP would
-only be used to select the state. Use \code{\link[=zip_to_state]{zip_to_state()}} to resolve one.
+only be used to select the state.
 }
 \examples{
 \dontrun{

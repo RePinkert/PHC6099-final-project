@@ -2,7 +2,7 @@
 % Please edit documentation in R/life-loss.R
 \name{expected_life_loss}
 \alias{expected_life_loss}
-\title{Expected life expectancy loss for a ZIP code at a month}
+\title{Expected life expectancy loss for a state at a month}
 \usage{
 expected_life_loss(
   state,
@@ -15,8 +15,7 @@ expected_life_loss(
 }
 \arguments{
 \item{state}{A two-letter USPS state code (\code{"FL"}) or a full state name.
-The price layer is state-level, so a ZIP is refused; resolve one with
-\code{\link[=zip_to_state]{zip_to_state()}} first.}
+The price layer is state-level, so a ZIP is refused.}
 
 \item{time}{A month ("YYYY-MM", "YYYY/M", "YYYY/MM" or Date); exactly one value.}
 
@@ -55,6 +54,6 @@ population / -1.0 to -2.7 most deprived) and Chirakijja et al. (NBER WP
 expected_life_loss("FL", "2026-07")
 expected_life_loss("FL", "2026-12", bill = 180, usage = 1200)
 expected_life_loss("FL", "2026-12", delta_le = 0.01)
-expected_life_loss(zip_to_state("32601")$state, "2026-07")
+expected_life_loss("Florida", "2026-07")
 }
 }

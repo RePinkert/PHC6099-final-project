@@ -25,7 +25,7 @@ previous quarter (the VSRR source is quarterly — the placeholder \code{"mom"}
 period is not available and is refused honestly).
 }
 \details{
-Takes a state, not a ZIP code; resolve a ZIP with \code{\link[=zip_to_state]{zip_to_state()}}.
+Takes a state, not a ZIP code: the VSRR source is state-level.
 }
 \examples{
 \dontrun{

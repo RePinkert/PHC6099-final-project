@@ -32,7 +32,7 @@
 #' `sensitivity_assumption` column (estimate_type says "synthetic_e0").
 #'
 #' Takes a state, not a ZIP code: the VSRR source is state-level, so a ZIP would
-#' only be used to select the state. Use [zip_to_state()] to resolve one.
+#' only be used to select the state.
 #'
 #' @param state A two-letter USPS state code (`"FL"`) or a full state name.
 #' @param quarter A quarter ("YYYY-Qn"); default: the latest VSRR quarter shipped.

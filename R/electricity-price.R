@@ -1,7 +1,7 @@
 # electricity_price() —— 州级电价 accessor（实装自 exp#37；W0 起收州，不再收 ZIP）。
 # 年度 = A1 州年价（客户加权，2023/2024/2025）＋该州 utility 范围；
 # mom = B1 州级月频序列（2023-01→2026-07，provisional = EIA 标 Preliminary 的月份）。
-# ZIP -> 州 的查询在 zip_to_state()；本函数不再接受 ZIP（见 .state_code()）。
+# 本函数只收州码；ZIP 形状被指名拒绝（见 .state_code()）。
 
 .mom_series <- function(state) {
   state <- .state_code(state)
@@ -44,9 +44,8 @@
 #'
 #' This function takes a state, not a ZIP code: no source publishes a realised
 #' average residential price per ZIP, so every ZIP in a state would return the
-#' same number. Use [zip_to_state()] to resolve a ZIP, and read `price_min` /
-#' `price_max` / `within_state_sd` as the declared distance between the state
-#' value and the utilities inside it.
+#' same number. Read `price_min` / `price_max` / `within_state_sd` as the
+#' declared distance between the state value and the utilities inside it.
 #'
 #' @param state A two-letter USPS state code (`"FL"`) or a full state name
 #'   (`"Florida"`). A ZIP code is refused by name, because it would promise a
@@ -60,14 +59,14 @@
 #'   `price_max` and `n_utility` for the state's utilities), 43 rows for the
 #'   monthly series (with `within_state_sd`, the customer-weighted spread of
 #'   utility prices inside the state).
-#' @seealso [zip_to_state()], [electricity_price_trend()], [my_electricity()]
+#' @seealso [electricity_price_trend()], [my_electricity()]
 #' @export
 #'
 #' @examples
 #' \dontrun{
 #' electricity_price("FL", year = 2024)
 #' electricity_price("FL", period = "mom")
-#' electricity_price(zip_to_state("32601")$state, year = 2024)
+#' electricity_price("Florida", year = 2024)
 #' }
 electricity_price <- function(state, year = NULL, period = NULL) {
   if (is.null(year) && is.null(period)) {

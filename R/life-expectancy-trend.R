@@ -6,7 +6,7 @@
 #' previous quarter (the VSRR source is quarterly — the placeholder `"mom"`
 #' period is not available and is refused honestly).
 #'
-#' Takes a state, not a ZIP code; resolve a ZIP with [zip_to_state()].
+#' Takes a state, not a ZIP code: the VSRR source is state-level.
 #'
 #' @param state A two-letter USPS state code (`"FL"`) or a full state name.
 #' @param period One of `"yoy"` or `"qoq"`.

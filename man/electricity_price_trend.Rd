@@ -24,8 +24,7 @@ monthly series (42 rows; a flagged provisional change involves at least one
 provisional month).
 }
 \details{
-Takes a state, not a ZIP code: see \code{\link[=electricity_price]{electricity_price()}} for why, and
-\code{\link[=zip_to_state]{zip_to_state()}} to resolve a ZIP.
+Takes a state, not a ZIP code: see \code{\link[=electricity_price]{electricity_price()}} for why.
 }
 \examples{
 \dontrun{

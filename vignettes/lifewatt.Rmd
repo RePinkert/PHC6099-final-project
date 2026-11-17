@@ -28,15 +28,12 @@ source actually publishes:
   ZIP code.
 
 No source publishes a realised average residential price per ZIP code, so the
-price layer takes a state and `zip_to_state()` resolves a ZIP to its state.
+price layer takes a state and refuses a ZIP by name.
 
 ## Workflow
 
 ```{r eval = FALSE}
 library(lifewatt)
-
-# a ZIP only ever selects a state
-zip_to_state("32601")            # zip / state / mapping_vintage / n_utility
 
 # observed annual price, state-level (customer-weighted across the state's utilities)
 electricity_price("FL", year = 2024)
@@ -64,9 +61,9 @@ health_measure("32601", measure = c("DIABETES", "BPHIGH"))
 ```
 
 Price and life-expectancy functions accept a two-letter USPS code or a full
-state name; a ZIP code is refused by name and the error points at
-`zip_to_state()`. `health_measure()` is the exception: CDC PLACES publishes by
-ZCTA, so it needs a ZIP and says so when handed a state.
+state name; a ZIP code is refused by name and the error points at the state
+form. `health_measure()` is the exception: CDC PLACES publishes by ZCTA, so it
+needs a ZIP and says so when handed a state.
 
 ## Provenance and honesty contract
 

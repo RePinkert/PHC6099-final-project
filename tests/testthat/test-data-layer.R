@@ -18,12 +18,13 @@ test_that("extdata layer ships phaseB fit with passing gate", {
 test_that("all data planes agree on the 51-state universe (no silent divergence)", {
   cache <- lifewatt:::.monthly_cache()
   fit <- lifewatt:::.price_fit()
-  map <- lifewatt:::.open_map()
+  hist_states <- rownames(lifewatt:::.price_history_wide())
   vsrr <- utils::read.csv(system.file("extdata", "vsrr_state_quarter_slim.csv.gz", package = "lifewatt"),
                           colClasses = c(state = "character"))
   states <- unique(cache$state)
   expect_setequal(fit$states, states)
-  expect_true(all(unique(map$state) %in% states))
+  ## 2026-11-17：OpenEI 映射已退场，州集合改由随包价格史面板核对
+  expect_setequal(hist_states, states)
   expect_true(all(states %in% unique(vsrr$state)))
   c1 <- utils::read.csv(system.file("extdata", "eia112_state_month_slim.csv.gz", package = "lifewatt"),
                         colClasses = c(state = "character"))

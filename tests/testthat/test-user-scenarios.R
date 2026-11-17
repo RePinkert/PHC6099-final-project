@@ -1,4 +1,4 @@
-# test-user-scenarios.R —— 用户侧回归用例（W0：价格/寿命收州，ZIP 只经 zip_to_state）
+# test-user-scenarios.R —— 用户侧回归用例（W0：价格/寿命收州；2026-11-17 起 ZIP 只在健康侧按 ZCTA 用）
 # 数值契约用 expect_equal 对账内部层；快照只锁用户可见的形状与报错文本。
 # 与 HANDOVER 的真实调用留档一一对应；W0 改写了首参与列集，快照随之重录。
 
@@ -82,16 +82,16 @@ test_that("scenario 7: 逐月序列（mom 43 行，provisional = EIA Preliminary
   expect_provenance_cols(m)
 })
 
-test_that("scenario 8: ZIP 只用于查州（多 utility ZIP、ZIP+4、前导零）", {
-  z <- zip_to_state(anchor_zip_multi)
-  expect_equal(z$state, "NC")
-  expect_equal(z$n_utility, 7L)
-  expect_equal(z$mapping_vintage, "2024")
-  ## 文档承诺的路径：ZIP -> 州 -> 数值
-  expect_equal(expected_life_loss(z$state, "2026-09", delta_le = 0.02)$state, "NC")
-  expect_equal(zip_to_state(paste0(anchor_zip_fl, "-4401"))$zip, anchor_zip_fl)
+test_that("scenario 8: ZIP 只在健康侧按 ZCTA 归一化；价格/寿命层收州", {
+  ## 归一化仍在：health_measure() 靠它按 ZCTA 查 CDC PLACES
+  expect_equal(lifewatt:::.zip5(anchor_zip_multi), anchor_zip_multi)
+  expect_equal(lifewatt:::.zip5(paste0(anchor_zip_fl, "-4401")), anchor_zip_fl)
   expect_equal(lifewatt:::.zip5("01002"), "01002")
   expect_error(lifewatt:::.zip5("1002"), "leading zeros required", fixed = TRUE)  # 4 位写法拒绝，防呆
+  ## 价格/寿命层：只有州码入口，州码的两种写法给出同一行数值
+  expect_equal(expected_life_loss(anchor_state_nc, "2026-09", delta_le = 0.02)$state, "NC")
+  expect_identical(expected_life_loss(anchor_state_fl, "2026-07"),
+                   expected_life_loss("fl", "2026-07"))
 })
 
 test_that("scenario 9: 讲不通的输入会被指名拒绝（快照锁定用户可见报错文本）", {
@@ -110,9 +110,6 @@ test_that("scenario 9: 讲不通的输入会被指名拒绝（快照锁定用户
   # 无 year/period 直接调用：mock 意向下必须有指路信息
   expect_snapshot(
     tryCatch(electricity_price(anchor_state_fl), error = function(e) e)$message
-  )
-  expect_snapshot(
-    tryCatch(zip_to_state("FL"), error = function(e) e)$message
   )
 })
 

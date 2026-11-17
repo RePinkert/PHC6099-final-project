@@ -1,7 +1,7 @@
 # my_electricity() —— UX 契约正门的能源侧兄弟包装（exp#35，2026-10-16 mock 签名）
 # 与 expected_life_loss() 共用 .price_at() 与 .bill_evidence()；只做能量核算，不碰 LE。
 
-#' Estimated electricity situation for a ZIP code at a month
+#' Estimated electricity situation for a state at a month
 #'
 #' Energy-side view of the [expected_life_loss()] machinery: the price estimate at
 #' `time` (observed B1 state price up to 2026-07, LSTM forecast afterwards),
@@ -9,8 +9,7 @@
 #' `usage` is also supplied).
 #'
 #' @param state A two-letter USPS state code (`"FL"`) or a full state name.
-#'   The price layer is state-level, so a ZIP is refused; resolve one with
-#'   [zip_to_state()] first.
+#'   The price layer is state-level, so a ZIP is refused.
 #' @param bill Optional monthly electricity bill in USD; default unset (it is evidence,
 #'   not a required input).
 #' @param time A month ("YYYY-MM", "YYYY/M", "YYYY/MM" or Date); exactly one value.

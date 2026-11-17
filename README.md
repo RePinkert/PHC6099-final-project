@@ -11,8 +11,8 @@ actually publishes:
   life-expectancy loss view anchored to published national life tables, and a
   synthetic life-expectancy estimate built from state mortality rates
   (explicitly labeled, fully assumption-declared). No source publishes a
-  realised average residential price per ZIP code, so this layer takes a state;
-  `zip_to_state()` resolves a ZIP to its state.
+  realised average residential price per ZIP code, so this layer takes a state
+  and says so by name when handed a ZIP.
 - **By ZCTA** — CDC PLACES adult health prevalence for the ZCTA that matches a
   ZIP code. This is the one interface that still takes a ZIP.
 
@@ -39,9 +39,6 @@ slices, and `health_measure` landed as its own commit after them.
 
 ```r
 library(lifewatt)
-
-# a ZIP only ever selects a state; this is the only ZIP-facing lookup
-zip_to_state("32601")            # zip / state / mapping_vintage / n_utility
 
 # observed annual price, state-level (EIA-861, customer-weighted)
 electricity_price("FL", year = 2024)
@@ -77,7 +74,7 @@ health_measure("32601", measure = c("DIABETES", "BPHIGH"))
 ```
 
 Price and life-expectancy functions take a two-letter USPS code or a full state
-name; a ZIP code is refused by name and the error points at `zip_to_state()`.
+name; a ZIP code is refused by name and the error points at the state form.
 Every row carries provenance columns (`source`, `level`, `degraded_from`,
 `mapping_vintage`, `provisional`) and, where assumptions are declared, a
 `sensitivity_assumption` column. `degraded_from` is `NA` on every price and
@@ -127,7 +124,8 @@ a state line, so the blend could only ever pick the state — while it did impor
 an unvalidated rule for overlapping service territories (an overlapping block
 resolved to the smallest territory put essentially all of ZIP 32601's and
 32608's population in overlaps). The table, the assembler and the weighting are
-gone; `zip_to_state()` keeps the one fact the mapping carries.
+gone — and so is the ZIP->state mapping itself (2026-11-17): `health_measure()`
+is the only interface that still takes a ZIP, because CDC PLACES publishes by ZCTA.
 
 ## Price forecast: what the validation shows and what it does not
 
@@ -258,10 +256,21 @@ but not always, cover the same area; `level = "zcta"` and
 ## Scope notes
 
 - **Breaking change (2026-11)**: the price and life-expectancy interfaces take a
-  state instead of a ZIP; `zip_to_state()` is the only ZIP lookup;
-  `inst/extdata/zip_utility_share_slim.csv.gz` and the ZIP population-share blend
-  are gone; `degraded_from` and `mapping_vintage` are `NA` on state-level rows.
-  See `NEWS.md`.
+  state instead of a ZIP; `inst/extdata/zip_utility_share_slim.csv.gz` and the ZIP
+  population-share blend are gone; `degraded_from` and `mapping_vintage` are
+  `NA` on state-level rows. See `NEWS.md`.
+- **Breaking change (2026-11-17)**: `zip_to_state()` is deleted — respondents know
+  their state, and the price layer was state-level anyway. With it go the A2
+  OpenEI ZIP->state mapping asset (`inst/extdata/openei_zip2state_slim.csv.gz`,
+  232 KB) and its assembler: 8 exports -> 7, 11 -> 10 shipped data assets.
+  `health_measure()` remains the only ZIP-facing interface (PLACES publishes by
+  ZCTA), and ZIP normalisation (5 digits, ZIP+4, leading zeros) still happens there.
+- **The forecast interval now reaches the user (2026-11-17)**: `expected_life_loss()`
+  and `my_electricity()` rows in the predicted regime carry `price_lo` /
+  `price_hi` plus a `price_interval_basis` declaration (the band whose coverage the
+  shipped ledger actually measures; marginal per-horizon, not joint over h=1..5).
+  Observed months keep those three columns `NA` — a measured month has no
+  forecast band.
 - `delta_le` has no sourced elasticity yet (as of 2026-11-18 contract); it is a
   caller-supplied sensitivity parameter and the output labels it as such.
 - EIA-112 disconnection mechanism data covers 2024 only.

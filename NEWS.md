@@ -1,5 +1,16 @@
 # lifewatt 0.0.0.9000
 
+* **BREAKING：`zip_to_state()` 删除（导出 8 -> 7）（2026-11-17）**：
+  - **删除导出 `zip_to_state()`**：受访者知道自己的州，而价格/寿命层本来就是州级的
+    （同一个州的任意两个 ZIP 返回同一个数），所以"查州"这一步没有用户价值。
+    导出数 **8 -> 7**；随包的 A2 OpenEI ZIP->州 映射资产
+    （`inst/extdata/openei_zip2state_slim.csv.gz`，232 KB）与 `data-raw/assemble_openei_slim.R`
+    一并退场（`inst/extdata` 11 -> 10 个冻结物）。
+  - **`health_measure()` 仍是唯一收 ZIP 的接口**（CDC PLACES 按 ZCTA 发布），
+    ZIP 归一化（前导零、ZIP+4、歧义拒绝）原样保留。
+  - **报错文案随之改写**：价格/寿命层收到 ZIP 形状时指名拒绝，并指向州码写法与
+    `health_measure()`，不再指向已删除的函数。
+
 * **BREAKING：价格与寿命层改为州级，ZIP 只用于查州（2026-11）**：
   随包不再合成 ZIP 级电价。免费的、全国覆盖的、且是**实收均价**的 ZIP 级住宅电价不存在
   （OpenEI 的 ZIP 查询官方写明是 utility 级；EIA-826 的 utility×月数据停在 2016），

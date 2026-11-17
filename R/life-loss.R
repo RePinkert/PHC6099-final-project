@@ -79,7 +79,7 @@
   }
 }
 
-#' Expected life expectancy loss for a ZIP code at a month
+#' Expected life expectancy loss for a state at a month
 #'
 #' Returns the electricity-price estimate at a time point (observed B1 state price for
 #' months up to 2026-07, LSTM forecast afterwards), combined with the user
@@ -93,8 +93,7 @@
 #' 25681, 2019) US heating-price winter-mortality direction evidence.
 #'
 #' @param state A two-letter USPS state code (`"FL"`) or a full state name.
-#'   The price layer is state-level, so a ZIP is refused; resolve one with
-#'   [zip_to_state()] first.
+#'   The price layer is state-level, so a ZIP is refused.
 #' @param time A month ("YYYY-MM", "YYYY/M", "YYYY/MM" or Date); exactly one value.
 #' @param bill Optional monthly electricity bill in USD; Bayesian evidence (default: unset).
 #' @param usage Optional monthly usage in kWh; together with `bill` it forms a local
@@ -115,7 +114,7 @@
 #' expected_life_loss("FL", "2026-07")
 #' expected_life_loss("FL", "2026-12", bill = 180, usage = 1200)
 #' expected_life_loss("FL", "2026-12", delta_le = 0.01)
-#' expected_life_loss(zip_to_state("32601")$state, "2026-07")
+#' expected_life_loss("Florida", "2026-07")
 #' }
 expected_life_loss <- function(state, time, bill = NULL, usage = NULL,
                                delta_le = NULL, meas_sd = 1) {
