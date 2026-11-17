@@ -1,5 +1,49 @@
 # lifewatt 0.0.0.9000
 
+* **用户侧测试修复（2026-11-17）**：按用户方式调用 9 个导出函数后发现的问题，逐条修正，不动数据与模型。
+  - `life_expectancy()` / `life_expectancy_trend()`：文档写的是 `"YYYY-Qn"`，代码却只认 `"2024Q4"`。
+    现在 `"2024Q4"`、`"2024-Q4"`、`"2024q4"` 都接受并归一化，报错文案给出实例。
+  - `electricity_price(year = 2024.5)` 不再被悄悄截成 2024；非整数、非数字年份指名拒绝。
+  - `price_features()` 新增 `price_vs_avg12m_pct`（对滚动 12 月均价），任何有 12 月历史的月份都有值；
+    年价未发布的月份在 `notes` 里指向它。文档说明年价（utility 客户加权）与月价（收入/售电量）口径不同，
+    部分州差 5-15%（德州 2024 约 14%）。删除未使用的内部函数。
+  - `lag_matrix()` 同一个州写多次只返回一份。
+  - 预测区间新增 `price_interval_level`（0.85）；`price_interval_basis` 写明"名义 85%"，
+    删除指向安装包里不存在的 `model_traning/` 文件的指针。
+  - 价格行新增 `n_utility_year`：`within_state_sd` / `n_utility` 取自哪一年的 EIA-861 表。
+  - `c1_source` 在 EIA-112 覆盖窗外不再是 NA，而是写明原因。
+  - `life_expectancy()` 新增 `ypll75_years_per_person`，文档说明 `ypll75_per_1k` 是生命表口径
+    （每千名新生儿），不能与 CDC 按人口算的 YPLL 率比较。
+  - B 级置信度标签不再说"比 ZIP 粗"（输入已是州）；去掉输出与文档里的未来日期"2026-11-18"。
+  - `expected_life_loss()`：`|delta_le| > 5` 年时给出警告（文献区间 -0.7 到 -2.7 年）；
+    文档写明 `le_loss_years` 就是调用方给的 `delta_le`，不是由电价推出来的。
+  - **`life_expectancy_trend()` 的变化方向可能与死亡率相反（隔离黑盒测试发现）**：合成 e0 = 全国锚 + 州相对全国的差，
+    而 2023 与 2024 季度用的锚不同（78.4 vs 79.0），全国死亡率也在变，所以两端直接相减混进了全国的变化
+    （例：MS 2024Q1 qoq 死亡率 +7.5/10 万，e0 却 "+0.42 年"）。`e0_change_years` 现在是州自身合成生命表 e0 的变化
+    （MS 同例 -0.077 年），原来的两端直接差保留为新列 `e0_synth_diff_years`，跨锚时 `notes` 说明。
+    `period = "mom"` 改为说明原因的报错；重复的 notes 去重。
+  - `delta_le` 正负号：正 = 损失。文献区间原写成 "LE -0.7 to -2.7"，照抄会变成"收益"；改写为
+    "损失 0.7 到 2.7 年，即 delta_le = 0.7 到 2.7"，负值给出警告。
+  - 账单证据与州价差距过大（预测期 > 3 sd，实测期 > 3 个州内 sd）时在 `notes` 里提示，不拒绝。
+  - `?lifewatt` 首页还写着"按 ZIP 查询"，改为州 + ZCTA，并列出 9 个导出；README 导出数同步。
+  - 报错文案去掉内部代号（B1 cache、candidate-list 等），超窗时指向 `price_features()` / `lag_matrix()`；
+    `price_features(period = c(...))` 报错指名 `period` 而不是 `time`；ZIP 拒绝文案不再只说"价格"。
+  - 空输入：`lag_matrix(character(0))`、`lags = integer(0)`、`health_measure(measure = character(0))` 指名拒绝；
+    `notes` 末尾不再留 " | "。
+  - **第二轮隔离黑盒测试**：
+    - `electricity_price_trend("yoy")` 新增 `monthly_avg_pct_of_prior`（同一年用月度序列均值算的同比）；
+      两种口径方向相反时 `note` 指名（MA 2025：年度 -8.9%，月均 +3.7%；102 个州×年里有 2 例）。
+    - 预测偏低写进 `price_interval_basis`（从随包 fit 的 `r_q50` 读取：h=1..5 为 +1.7% 到 +5.2%）与帮助页。
+    - `life_expectancy()` 帮助页说明 2023→2024 锚值换年带来的全州约 +0.6 年跳变；
+      `life_expectancy_trend()` 说明符号规则的适用范围，起始季度越界时直接告诉最早可用季度。
+    - `period` 不分大小写（`"MOM"`、`"YOY"`、`"QoQ"`）。
+    - `electricity_price(year = 2022)` 的报错指出 2010-2025 的州年价可在 `price_features()$annual_price` 拿到。
+    - `|delta_le|` 不小于全国预期寿命时报错；只给 bill 时推算用电量离谱（< 20 或 > 20,000 kWh）给警告；
+      `lag_matrix()` 某个滞后对所有行都越出面板时给警告。
+    - 示例改为可运行（只有联网的 `health_measure()` 用 `\donttest`）。README 导出列表理顺。
+  - 测试：新增 `tests/testthat/test-user-facing-fixes.R`，更新受影响的旧断言（报错文案、
+    `e0_change_years` 定义）与 user-scenarios 快照。1125 PASS / 0 FAIL。
+
 * **解冻 `price_features()` / `lag_matrix()`（2026-11-17）**：设计稿里这两个函数一直挂在
   "未落地"清单上（滚动/滞后统计内联在价格与 LE 两个 LSTM 前向里）。算力本来就在包里，
   这次只是把同一批计算以**普通用户看得懂的单位**交还给用户：导出 **7 → 9**。

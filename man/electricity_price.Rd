@@ -22,7 +22,15 @@ A data.frame with the price (cents/kWh), the provenance columns
 \code{confidence_tier} label; one row for the annual regime (with \code{price_min},
 \code{price_max} and \code{n_utility} for the state's utilities), 43 rows for the
 monthly series (with \code{within_state_sd}, the customer-weighted spread of
-utility prices inside the state).
+utility prices inside the state, \code{n_utility}, and \code{n_utility_year}, the
+EIA-861 year those two come from: the latest released year not after the
+month).
+
+The annual price and the monthly series are built differently: the annual
+value is a customer-weighted mean of utility prices, the monthly value is
+state revenue divided by state sales. In most states they agree within a
+few percent, but in some they sit up to about 16\% apart on a yearly average (Texas 2024: 12.9 annual vs
+15.0 monthly average), so compare like with like.
 }
 \description{
 Returns the state-level residential electricity price. The annual value is
@@ -38,11 +46,9 @@ same number. Read \code{price_min} / \code{price_max} / \code{within_state_sd} a
 declared distance between the state value and the utilities inside it.
 }
 \examples{
-\dontrun{
 electricity_price("FL", year = 2024)
 electricity_price("FL", period = "mom")
 electricity_price("Florida", year = 2024)
-}
 }
 \seealso{
 \code{\link[=electricity_price_trend]{electricity_price_trend()}}, \code{\link[=my_electricity]{my_electricity()}}

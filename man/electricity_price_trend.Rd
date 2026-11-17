@@ -9,13 +9,18 @@ electricity_price_trend(state, period = c("yoy", "mom"))
 \arguments{
 \item{state}{A two-letter USPS state code (\code{"FL"}) or a full state name.}
 
-\item{period}{One of \code{"yoy"} or \code{"mom"}.}
+\item{period}{One of \code{"yoy"} or \code{"mom"} (case-insensitive).}
 }
 \value{
 A data.frame with the change (cents/kWh) and provenance columns.
 Positive change = price increase; negative = decrease. The year-over-year
 rows also carry \code{n_utility} and \code{n_utility_prior}, because the set of
-priced utilities can differ between the two years.
+priced utilities can differ between the two years, and
+\code{monthly_avg_pct_of_prior}: the same year-over-year change computed from
+the average of the monthly series (state revenue / state sales). The two
+measures are built differently (see \code{\link[=electricity_price]{electricity_price()}}) and usually
+agree on direction; when they do not (for example Massachusetts 2025),
+\code{note} says so.
 }
 \description{
 Year-over-year change of the state-level annual price (EIA-861, 2024 and 2025
@@ -27,8 +32,6 @@ provisional month).
 Takes a state, not a ZIP code: see \code{\link[=electricity_price]{electricity_price()}} for why.
 }
 \examples{
-\dontrun{
 electricity_price_trend("FL", period = "yoy")
 electricity_price_trend("FL", period = "mom")
-}
 }

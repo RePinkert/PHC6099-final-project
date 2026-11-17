@@ -9,27 +9,44 @@ life_expectancy_trend(state, period = c("yoy", "qoq"), quarter = NULL)
 \arguments{
 \item{state}{A two-letter USPS state code (\code{"FL"}) or a full state name.}
 
-\item{period}{One of \code{"yoy"} or \code{"qoq"}.}
+\item{period}{One of \code{"yoy"} or \code{"qoq"} (case-insensitive).}
 
-\item{quarter}{A quarter ("YYYY-Qn"); default: the latest VSRR quarter shipped.}
+\item{quarter}{A quarter such as \code{"2024Q4"} (\code{"2024-Q4"} is also accepted);
+default: the latest VSRR quarter shipped.}
 }
 \value{
-A one-row data.frame with the from/to synthetic e0 values, their
-change (years and mortality-rate terms) and full provenance plus the
-\code{sensitivity_assumption} declaration.
+A one-row data.frame with the from/to synthetic e0 values
+(\code{e0_synth_from}, \code{e0_synth_to}, as \code{\link[=life_expectancy]{life_expectancy()}} reports them), the
+change and full provenance plus the \code{sensitivity_assumption} declaration.
+
+\code{e0_change_years} is the change driven by the state's own death rates:
+the change in life expectancy of the state's synthetic life table between
+the two quarters. It moves opposite to \code{rate_change_per_100k} whenever
+the rate changes by more than a few deaths per 100,000; for smaller rate
+changes, a shift in the national age pattern of deaths can decide the
+sign, and the change is then a few hundredths of a year either way.
+\code{e0_synth_diff_years} is the plain difference of the two reported values.
+The two differ because each reported e0 is a national anchor plus the
+state's distance from the national rate: the anchor is a different NCHS
+year for 2023 and 2024 quarters (78.4 vs 79.0), and the national rate
+moves too, so \code{e0_synth_diff_years} mixes the state's change with the
+national one, and the two can even differ in sign. Use \code{e0_change_years}
+to ask whether the state itself improved. The earliest usable \code{quarter}
+is 2023Q2 for \code{"qoq"} and 2024Q1 for \code{"yoy"}.
+\code{rate_from_per_100k}, \code{rate_to_per_100k} and \code{rate_change_per_100k} are
+the state's age-adjusted death rates per 100,000 (12-month ending).
 }
 \description{
 Quarter-over-period change in the \code{\link[=life_expectancy]{life_expectancy()}} synthetic estimate:
 \code{period = "yoy"} compares the same quarter a year earlier, \code{"qoq"} the
-previous quarter (the VSRR source is quarterly — the placeholder \code{"mom"}
-period is not available and is refused honestly).
+previous quarter. The death-rate source (CDC VSRR) is quarterly, so
+\code{"mom"} is refused with an explanation. Shipped quarters run from 2023Q1 to
+2025Q3.
 }
 \details{
 Takes a state, not a ZIP code: the VSRR source is state-level.
 }
 \examples{
-\dontrun{
 life_expectancy_trend("FL", period = "yoy")
 life_expectancy_trend("FL", period = "qoq")
-}
 }

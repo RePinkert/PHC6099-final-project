@@ -11,7 +11,9 @@ lag_matrix(states = NULL, from = NULL, to = NULL, lags = 0:12)
 state in the shipped panel.}
 
 \item{from, to}{An optional month range (\code{"YYYY-MM"}). \code{from} defaults to
-\code{to} minus the longest requested lag, so that every lag is populated.}
+\code{to} minus the longest requested lag, so that every lag is populated (or
+the first shipped month, 2010-01, if that is later; a lag that reaches
+before 2010-01 for every row gives a warning).}
 
 \item{lags}{Whole numbers of months to go back; default \code{0:12}.}
 }
@@ -33,11 +35,9 @@ All values are \strong{observed} (EIA-861M retail sales, shipped panel
 \code{NA} — it is not filled from another source.
 }
 \examples{
-\dontrun{
 lag_matrix("FL")                                  # last 13 months, 12 lags
 lag_matrix(c("FL", "NC"), lags = 0:6)
 lag_matrix("FL", from = "2025-01", to = "2025-12")
-}
 }
 \seealso{
 \code{\link[=price_features]{price_features()}}, \code{\link[=electricity_price]{electricity_price()}}

@@ -59,7 +59,7 @@ test_that("beyond-window inputs dispatch to the predicted branch (exp#33)", {
   obs <- lifewatt:::.price_at(anchor_state_fl, "2026-07")
   expect_true(is.na(obs$price_lo) && is.na(obs$price_hi))
   expect_true(is.na(obs$price_interval_basis))
-  expect_error(lifewatt:::.price_at(anchor_state_fl, "2022-12"), "no record for state FL", fixed = TRUE)
+  expect_error(lifewatt:::.price_at(anchor_state_fl, "2022-12"), "no monthly price for FL at 2022-12", fixed = TRUE)
 })
 
 test_that("malformed time and location inputs fail loudly", {

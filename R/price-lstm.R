@@ -308,8 +308,11 @@
   cal <- as.numeric(f$coverage$calib_in_sample)
   tr  <- as.numeric(f$coverage$transfer_early_window)
   sprintf(paste0(
-    "abs_q85 band (|relative residual| <= abs_q85[h]); marginal, single horizon -- NOT joint over h=1..5; ",
+    "nominal 85%% interval: abs_q85 band (|relative residual| <= abs_q85[h]); marginal, single horizon -- NOT joint over h=1..5; ",
     "calibration window %s; coverage in-sample %.3f-%.3f, transfer window %.3f-%.3f; frozen fit seed %s; ",
-    "seed-to-seed band not shipped (measured research-side, see model_traning/conf_serving_seedband.csv)"),
-    f$calib_window, min(cal), max(cal), min(tr), max(tr), f$seed)
+    "seed-to-seed variation was measured during development and is not included in this band; ",
+    "the forecast centre has run LOW in calibration (median truth/forecast - 1 = %s at h=1..5), ",
+    "and the band is symmetric around the uncorrected forecast"),
+    f$calib_window, min(cal), max(cal), min(tr), max(tr), f$seed,
+    paste(sprintf("%+.1f%%", 100 * f$intervals$r_q50), collapse = ", "))
 }

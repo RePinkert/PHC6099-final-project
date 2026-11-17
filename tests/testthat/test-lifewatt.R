@@ -50,11 +50,12 @@ test_that("life_expectancy: synthetic e0 with provenance + declared assumptions 
 test_that("life_expectancy_trend: yoy/qoq on the quarterly synthesis; mom refused honestly", {
   ty <- life_expectancy_trend(anchor_state_fl, period = "yoy", quarter = "2024Q4")
   expect_equal(ty$from_quarter, "2023Q4")
-  expect_equal(ty$e0_change_years, ty$e0_synth_to - ty$e0_synth_from, tolerance = 1e-9)
+  expect_equal(ty$e0_synth_diff_years, ty$e0_synth_to - ty$e0_synth_from, tolerance = 1e-9)
+  expect_equal(ty$e0_change_years, lifewatt:::.le_synth("FL", "2024Q4")$e1_synth - lifewatt:::.le_synth("FL", "2023Q4")$e1_synth, tolerance = 1e-9)
   tq <- life_expectancy_trend(anchor_state_fl, period = "qoq", quarter = "2024Q4")
   expect_equal(tq$from_quarter, "2024Q3")
   expect_true(tq$provisional)
-  expect_error(life_expectancy_trend(anchor_state_fl, period = "mom"), "should be one of")
+  expect_error(life_expectancy_trend(anchor_state_fl, period = "mom"), "quarterly", fixed = TRUE)
   expect_provenance_cols(ty)
 })
 

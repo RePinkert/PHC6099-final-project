@@ -49,11 +49,15 @@
 #' @export
 #'
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' health_measure("32601")
 #' health_measure("32601", measure = c("DIABETES", "BPHIGH"))
 #' }
 health_measure <- function(zip, measure = NULL) {
+  if (!is.null(measure) && (!length(measure) || anyNA(measure))) {
+    stop("measure is empty or NA; give one or more PLACES measure IDs such as 'DIABETES', or leave it NULL for all.",
+         call. = FALSE)
+  }
   # W0：价格/寿命层收州，这里是唯一仍收 ZIP 的接口（PLACES 按 ZCTA 发布）。
   # 把州码传进来时指名解释这个不对称，而不是让它掉进"Invalid zip"。
   if (is.character(zip) && length(zip) == 1L && !is.na(zip) &&

@@ -4,12 +4,22 @@
 \name{lifewatt-package}
 \alias{lifewatt}
 \alias{lifewatt-package}
-\title{lifewatt: Environmental Justice Indicators by US ZIP Code}
+\title{lifewatt: Environmental Justice Indicators by US State and ZCTA}
 \description{
-\code{lifewatt} turns a US ZIP code into environmental justice indicators:
-average residential electricity price and its year-over-year (YoY) and
-month-over-month (MoM) trends, plus a synthetic life expectancy and its
-year-over-year and quarter-over-quarter trends.
+\code{lifewatt} reports environmental justice indicators at the granularity each
+source publishes. By \strong{state} (two-letter code or full name): residential
+electricity price with year-over-year and month-over-month trends, recent
+price features and lags, a forecast with an interval, bill-based evidence,
+a synthetic life expectancy with its trends, and an optional declared
+life-expectancy loss. By \strong{ZIP code} (matched to its ZCTA): CDC PLACES
+adult health prevalence via \code{\link[=health_measure]{health_measure()}}, the only function that
+takes a ZIP.
+}
+\details{
+Exported functions: \code{\link[=electricity_price]{electricity_price()}}, \code{\link[=electricity_price_trend]{electricity_price_trend()}},
+\code{\link[=price_features]{price_features()}}, \code{\link[=lag_matrix]{lag_matrix()}}, \code{\link[=my_electricity]{my_electricity()}},
+\code{\link[=expected_life_loss]{expected_life_loss()}}, \code{\link[=life_expectancy]{life_expectancy()}}, \code{\link[=life_expectancy_trend]{life_expectancy_trend()}},
+\code{\link[=health_measure]{health_measure()}}.
 }
 \author{
 \strong{Maintainer}: RePinkert \email{61274955+RePinkert@users.noreply.github.com}

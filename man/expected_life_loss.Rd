@@ -25,38 +25,50 @@ The price layer is state-level, so a ZIP is refused.}
 price measurement that is inverse-variance blended into a posterior (predicted
 regime) or reported as a local measurement (observed regime).}
 
-\item{delta_le}{Optional declared life-expectancy shift in years (caller-supplied
-sensitivity parameter; negative = gain). Not sourced yet.}
+\item{delta_le}{Optional declared life-expectancy \strong{loss} in years
+(caller-supplied sensitivity parameter): positive = loss, negative = gain.
+A negative value triggers a warning, because the literature band above is
+a loss and is entered as a positive number. Not sourced yet.}
 
 \item{meas_sd}{Declared sd of the local price measurement (cents/kWh).}
 }
 \value{
 A one-row data.frame with price/implied-usage/bill-evidence columns, the
 NCHS national anchor, provenance columns (source/level/degraded_from/
-mapping_vintage/provisional), C1 disconnection mechanism columns
-(per-1k rates, Form EIA-112 2024 State Total; NA outside 2024) and a
-\code{sensitivity_assumption} declaration column. In the predicted regime the row
-also carries the model interval (\code{price_lo}/\code{price_hi}, with its
-\code{price_interval_basis} declaration); in the observed regime those three are
-NA because a measured month has no forecast band.
+mapping_vintage/provisional), C1 utility disconnection columns
+(monthly counts per 1,000 residential customers, Form EIA-112 2024 State Total; NA outside 2024, with
+\code{c1_source} saying why) and a \code{sensitivity_assumption} declaration column.
+\code{within_state_sd} and \code{n_utility} come from the EIA-861 utility table of
+year \code{n_utility_year}. In the predicted regime the row also carries the
+model interval (\code{price_lo}/\code{price_hi}, a nominal 85\% interval given in
+\code{price_interval_level}, with its \code{price_interval_basis} declaration).
+The forecast has run low in calibration (the truth was a median 1.7\% to
+5.2\% above it, growing with the horizon) and is not bias-corrected, so a
+forecast below the last observed month is not by itself evidence of a
+price fall; in
+the observed regime those four and \code{price_sd} are NA because a measured
+month has no forecast band.
+
+When \code{delta_le} is supplied, \code{le_loss_years} is that declared shift
+itself (it is not derived from the price), and \code{le_loss_pct_of_anchor}
+expresses it as a share of the national anchor.
 }
 \description{
-Returns the electricity-price estimate at a time point (observed B1 state price for
+Returns the electricity-price estimate at a time point (observed EIA state price for
 months up to 2026-07, LSTM forecast afterwards), combined with the user
 bill as Bayesian evidence and (optionally) a life-expectancy loss estimate.
-Without \code{delta_le} the loss columns are withheld: no sourced US ZIP-level
-price-to-life-expectancy elasticity exists yet (HANDOVER quarantine contract,
-2026-11-18; exp#40 literature check). The \code{sensitivity_assumption} column
-carries the closest sourced context: Richardson et al. (BMJ Public Health
-2023;1:e000097) energy-cost-shock LE scenario band (-0.7 to -1.6 years
-population / -1.0 to -2.7 most deprived) and Chirakijja et al. (NBER WP
-25681, 2019) US heating-price winter-mortality direction evidence.
+Without \code{delta_le} the loss columns are withheld: no sourced US
+price-to-life-expectancy elasticity exists yet (a literature check found
+none). The \code{sensitivity_assumption} column carries the closest sourced
+context: Richardson et al. (BMJ Public Health 2023;1:e000097) estimate that
+an energy-cost shock lowers life expectancy by 0.7 to 1.6 years (population)
+and 1.0 to 2.7 years (most deprived), and Chirakijja et al. (NBER WP 25681,
+2019) give US heating-price winter-mortality direction evidence. In this
+function's sign convention those losses are \code{delta_le = 0.7} to \code{2.7}.
 }
 \examples{
-\dontrun{
 expected_life_loss("FL", "2026-07")
 expected_life_loss("FL", "2026-12", bill = 180, usage = 1200)
-expected_life_loss("FL", "2026-12", delta_le = 0.01)
+expected_life_loss("FL", "2026-12", delta_le = 1)
 expected_life_loss("Florida", "2026-07")
-}
 }

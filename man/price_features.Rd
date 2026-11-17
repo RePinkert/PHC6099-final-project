@@ -19,10 +19,12 @@ exclusive with \code{from}/\code{to}.}
 A data.frame with one row per month: \code{price}, \code{avg_3m}, \code{avg_6m},
 \code{avg_12m}, \code{change_1m}, \code{change_1m_pct}, \code{change_12m},
 \code{change_12m_pct}, \code{trend_12m} (cents/kWh per month, straight-line slope
-over the trailing 12 months), \code{annual_price}, \code{price_vs_annual_pct}
-(percent above/below the annual price), the provenance columns
-(\code{source}/\code{level}/\code{degraded_from}/\code{mapping_vintage}/\code{provisional}) and
-\code{imputed} (TRUE if the assembler filled the cell).
+over the trailing 12 months), \code{price_vs_avg12m_pct} (percent above/below
+the trailing 12-month average), \code{annual_price}, \code{price_vs_annual_pct}
+(percent above/below the annual price; see Details), \code{provisional},
+\code{imputed} (TRUE if the assembler filled the cell), \code{confidence_tier}, the
+provenance columns (\code{source}/\code{level}/\code{degraded_from}/\code{mapping_vintage})
+and \code{notes}.
 }
 \description{
 Returns what a household would want to know about its state's recent
@@ -39,16 +41,23 @@ Months EIA marks Preliminary are flagged row by row in \code{provisional}.
 
 The trailing averages, changes and trend are computed from observed months
 only, and are \code{NA} when the window is not fully covered by the shipped
-panel (they are never shortened silently). \code{annual_price} is the state's
-customer-weighted EIA-861 annual price and is \code{NA} for years EIA has not
-released yet (2026 at the time of writing).
+panel (they are never shortened silently).
+
+To answer "is this month expensive?", use \code{price_vs_avg12m_pct}: the month
+against the average of the 12 months ending with it, from the same monthly
+series. It is available for every month from 2010-12 onwards.
+\code{price_vs_annual_pct} compares the month with \code{annual_price}, the state's
+customer-weighted EIA-861 annual price. That annual price is built
+differently from the monthly series (a customer-weighted mean of utility
+prices, not state revenue divided by state sales), so in some states the two
+sit up to about 16\% apart on a yearly average, and single months further (Texas is about 14\% lower on the annual
+measure); read \code{price_vs_annual_pct} with that in mind. \code{annual_price} is
+\code{NA} for years EIA has not released yet (2026 at the time of writing).
 }
 \examples{
-\dontrun{
 price_features("FL")                       # the last 12 months
 price_features("FL", period = "2026-07")   # one month
 price_features("FL", from = "2024-01", to = "2024-12")
-}
 }
 \seealso{
 \code{\link[=lag_matrix]{lag_matrix()}}, \code{\link[=electricity_price]{electricity_price()}}

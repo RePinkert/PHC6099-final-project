@@ -70,9 +70,18 @@
 #'
 #' The trailing averages, changes and trend are computed from observed months
 #' only, and are `NA` when the window is not fully covered by the shipped
-#' panel (they are never shortened silently). `annual_price` is the state's
-#' customer-weighted EIA-861 annual price and is `NA` for years EIA has not
-#' released yet (2026 at the time of writing).
+#' panel (they are never shortened silently).
+#'
+#' To answer "is this month expensive?", use `price_vs_avg12m_pct`: the month
+#' against the average of the 12 months ending with it, from the same monthly
+#' series. It is available for every month from 2010-12 onwards.
+#' `price_vs_annual_pct` compares the month with `annual_price`, the state's
+#' customer-weighted EIA-861 annual price. That annual price is built
+#' differently from the monthly series (a customer-weighted mean of utility
+#' prices, not state revenue divided by state sales), so in some states the two
+#' sit up to about 16% apart on a yearly average, and single months further (Texas is about 14% lower on the annual
+#' measure); read `price_vs_annual_pct` with that in mind. `annual_price` is
+#' `NA` for years EIA has not released yet (2026 at the time of writing).
 #'
 #' @param state A two-letter USPS state code (`"FL"`) or a full state name.
 #' @param period A single month (`"YYYY-MM"`); returns one row. Mutually
@@ -82,19 +91,19 @@
 #' @return A data.frame with one row per month: `price`, `avg_3m`, `avg_6m`,
 #'   `avg_12m`, `change_1m`, `change_1m_pct`, `change_12m`,
 #'   `change_12m_pct`, `trend_12m` (cents/kWh per month, straight-line slope
-#'   over the trailing 12 months), `annual_price`, `price_vs_annual_pct`
-#'   (percent above/below the annual price), the provenance columns
-#'   (`source`/`level`/`degraded_from`/`mapping_vintage`/`provisional`) and
-#'   `imputed` (TRUE if the assembler filled the cell).
+#'   over the trailing 12 months), `price_vs_avg12m_pct` (percent above/below
+#'   the trailing 12-month average), `annual_price`, `price_vs_annual_pct`
+#'   (percent above/below the annual price; see Details), `provisional`,
+#'   `imputed` (TRUE if the assembler filled the cell), `confidence_tier`, the
+#'   provenance columns (`source`/`level`/`degraded_from`/`mapping_vintage`)
+#'   and `notes`.
 #' @seealso [lag_matrix()], [electricity_price()]
 #' @export
 #'
 #' @examples
-#' \dontrun{
 #' price_features("FL")                       # the last 12 months
 #' price_features("FL", period = "2026-07")   # one month
 #' price_features("FL", from = "2024-01", to = "2024-12")
-#' }
 price_features <- function(state, period = NULL, from = NULL, to = NULL) {
   state <- .state_code(state)
   Ph <- .price_history_wide()
@@ -106,14 +115,14 @@ price_features <- function(state, period = NULL, from = NULL, to = NULL) {
     stop("give either period or a from/to range, not both.", call. = FALSE)
   }
   if (!is.null(period)) {
-    per <- .month_key(period)
+    per <- .month_key(period, "period")
     if (!per %in% months) {
       stop(sprintf("month %s is outside the shipped price history (%s..%s).", per, months[1], months[length(months)]),
            call. = FALSE)
     }
     sel <- match(per, months)
   } else {
-    to_m <- if (is.null(to)) months[length(months)] else .month_key(to)
+    to_m <- if (is.null(to)) months[length(months)] else .month_key(to, "to")
     if (!to_m %in% months) {
       stop(sprintf("month %s is outside the shipped price history (%s..%s).", to_m, months[1], months[length(months)]),
            call. = FALSE)
@@ -122,7 +131,7 @@ price_features <- function(state, period = NULL, from = NULL, to = NULL) {
     if (is.null(from)) {
       from_m <- months[max(1L, j - 11L)]
     } else {
-      from_m <- .month_key(from)
+      from_m <- .month_key(from, "from")
       if (!from_m %in% months) {
         stop(sprintf("month %s is outside the shipped price history (%s..%s).", from_m, months[1], months[length(months)]),
              call. = FALSE)
@@ -135,12 +144,6 @@ price_features <- function(state, period = NULL, from = NULL, to = NULL) {
   p <- Ph[state, sel]
   n <- length(sel)
   idx <- sel
-  pull <- function(k) {
-    v <- rep(NA_real_, n)
-    ok <- idx - k >= 1L
-    v[ok] <- Ph[state, idx[ok] - k]
-    v
-  }
   avg3 <- avg6 <- avg12 <- NA_real_
   chg1 <- chg1p <- chg12 <- chg12p <- slope <- NA_real_
   for (i in seq_len(n)) {
@@ -169,8 +172,9 @@ price_features <- function(state, period = NULL, from = NULL, to = NULL) {
   im[cbind(match(fr$state, rownames(Ph)), match(fr$period, colnames(Ph)))] <- fr$imputed
   prov <- st[state, sel] == "Preliminary"
   imp <- im[state, sel] == 1L
+  vs12 <- ifelse(is.finite(avg12) & avg12 > 0, (p - avg12) / avg12 * 100, NA_real_)
   note <- ifelse(!is.finite(ann),
-                 "no annual reference for this year yet (EIA has not released it); the other columns are unaffected",
+                 "no EIA-861 annual price for this year yet; use price_vs_avg12m_pct to compare the month with the trailing 12-month average",
                  "")
   data.frame(
     state = state,
@@ -184,6 +188,7 @@ price_features <- function(state, period = NULL, from = NULL, to = NULL) {
     change_12m = chg12,
     change_12m_pct = chg12p,
     trend_12m = slope,
+    price_vs_avg12m_pct = vs12,
     annual_price = ann,
     price_vs_annual_pct = vsann,
     provisional = prov,
@@ -214,7 +219,9 @@ price_features <- function(state, period = NULL, from = NULL, to = NULL) {
 #' @param states Optional vector of state codes or names; default is every
 #'   state in the shipped panel.
 #' @param from,to An optional month range (`"YYYY-MM"`). `from` defaults to
-#'   `to` minus the longest requested lag, so that every lag is populated.
+#'   `to` minus the longest requested lag, so that every lag is populated (or
+#'   the first shipped month, 2010-01, if that is later; a lag that reaches
+#'   before 2010-01 for every row gives a warning).
 #' @param lags Whole numbers of months to go back; default `0:12`.
 #' @return A data.frame with one row per state and month: `price_now` and one
 #'   `price_<n>m_ago` column per lag, plus `provisional` and the provenance
@@ -223,25 +230,27 @@ price_features <- function(state, period = NULL, from = NULL, to = NULL) {
 #' @export
 #'
 #' @examples
-#' \dontrun{
 #' lag_matrix("FL")                                  # last 13 months, 12 lags
 #' lag_matrix(c("FL", "NC"), lags = 0:6)
 #' lag_matrix("FL", from = "2025-01", to = "2025-12")
-#' }
 lag_matrix <- function(states = NULL, from = NULL, to = NULL, lags = 0:12) {
   if (!is.numeric(lags) || any(!is.finite(lags)) || any(lags < 0) || any(lags != floor(lags))) {
     stop("lags must be whole numbers of months (0 or more).", call. = FALSE)
   }
+  if (!length(lags)) stop("lags must contain at least one whole number of months.", call. = FALSE)
   lags <- sort(unique(as.integer(lags)))
   Ph <- .price_history_wide()
   months <- colnames(Ph)
-  sts <- if (is.null(states)) rownames(Ph) else vapply(states, function(s) .state_code(s), character(1))
+  if (!is.null(states) && !length(states)) {
+    stop("states is empty; give one or more state codes, or leave it NULL for every state.", call. = FALSE)
+  }
+  sts <- if (is.null(states)) rownames(Ph) else unique(unname(vapply(states, function(s) .state_code(s), character(1))))
   miss <- setdiff(sts, rownames(Ph))
   if (length(miss)) {
     stop(sprintf("state(s) outside the shipped price history coverage: %s.", paste(miss, collapse = ", ")),
          call. = FALSE)
   }
-  to_m <- if (is.null(to)) months[length(months)] else .month_key(to)
+  to_m <- if (is.null(to)) months[length(months)] else .month_key(to, "to")
   if (!to_m %in% months) {
     stop(sprintf("month %s is outside the shipped price history (%s..%s).", to_m, months[1], months[length(months)]),
          call. = FALSE)
@@ -250,7 +259,7 @@ lag_matrix <- function(states = NULL, from = NULL, to = NULL, lags = 0:12) {
   if (is.null(from)) {
     from_m <- months[max(1L, j - max(lags))]
   } else {
-    from_m <- .month_key(from)
+    from_m <- .month_key(from, "from")
     if (!from_m %in% months) {
       stop(sprintf("month %s is outside the shipped price history (%s..%s).", from_m, months[1], months[length(months)]),
            call. = FALSE)
@@ -259,6 +268,13 @@ lag_matrix <- function(states = NULL, from = NULL, to = NULL, lags = 0:12) {
   i <- match(from_m, months)
   if (i > j) stop("from must not be after to.", call. = FALSE)
   sel <- i:j
+  empty <- lags[j - lags < 1L]
+  if (length(empty)) {
+    warning(sprintf(paste0(
+      "lag(s) %s reach before the first shipped month (%s) for every requested month; ",
+      "those columns are all NA. The panel holds %d months."),
+      paste(empty, collapse = ", "), months[1], length(months)), call. = FALSE)
+  }
   per <- months[sel]
   fr <- .price_history_frame()
   st <- matrix(NA_character_, nrow(Ph), ncol(Ph), dimnames = dimnames(Ph))

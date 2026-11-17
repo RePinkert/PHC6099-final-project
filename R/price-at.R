@@ -5,8 +5,9 @@
 # W0：输入是州，不是 ZIP。`zip`、`utilities`、`weight_note` 三列随之消失，
 #     `degraded_from` 从 "zip" 变为 NA（不再有降级可声明），`n_utility` 改为该州的家数。
 
-.month_key <- function(time) {
-  if (length(time) != 1L) stop("time expects exactly one value.", call. = FALSE)
+.month_key <- function(time, arg = "time") {
+  if (length(time) != 1L) stop(sprintf("%s expects exactly one month.", arg), call. = FALSE)
+  if (is.na(time)) stop(sprintf("%s is NA; a month such as '2026-07' is required.", arg), call. = FALSE)
   if (inherits(time, "Date")) {
     t <- format(time, "%Y-%m")
   } else {
@@ -16,7 +17,8 @@
     }
   }
   if (!grepl("^[0-9]{4}-[0-9]{2}$", t)) {
-    stop(sprintf("Invalid time: %s (expects YYYY-MM, YYYY/MM or Date).", time), call. = FALSE)
+    stop(sprintf("Invalid %s: %s (expects a month such as '2026-07', '2026/7' or a Date).", arg, time),
+         call. = FALSE)
   }
   m <- as.integer(substr(t, 6L, 7L))
   if (m < 1L || m > 12L) {
@@ -31,9 +33,9 @@
   period <- .month_key(time)
   cutoff <- fit$fit_as_of
   if (period > "2026-12") {
-    stop(sprintf(paste0("time %s is outside the supported window (2023-01..2026-12); ",
-                        "the forecast regime stops at 2026-12 (fit_as_of = %s, intervals ",
-                        "calibrated for horizons <= 13 months)."), period, cutoff),
+    stop(sprintf(paste0("time %s is outside the supported window (2023-01..2026-12): ",
+                        "observed prices run to %s and the forecast covers the 5 months after it. ",
+                        "For monthly history back to 2010 use price_features() or lag_matrix()."), period, cutoff),
          call. = FALSE)
   }
   spread <- .within_state_spread(state, as.integer(substr(period, 1L, 4L)))
@@ -50,6 +52,7 @@
       price_sd = pr$.sd,
       price_lo = pmax(0, pr$price - half),
       price_hi = pr$price + half,
+      price_interval_level = 0.85,
       price_interval_basis = .interval_basis(),
       regime = "predicted",
       provisional = NA,
@@ -60,6 +63,7 @@
       mapping_vintage = NA_character_,
       within_state_sd = spread$sd,
       n_utility = spread$n_utility,
+      n_utility_year = spread$year,
       confidence_tier = .confidence_tier("C"),
       stringsAsFactors = FALSE,
       row.names = NULL
@@ -68,7 +72,8 @@
   d <- .monthly_cache()
   row <- d[d$state == state & d$period == period, ]
   if (nrow(row) == 0L) {
-    stop(sprintf("B1 cache has no record for state %s at %s (observed window 2023-01 -> %s).",
+    stop(sprintf(paste0("no monthly price for %s at %s in this view (observed window 2023-01 -> %s). ",
+                        "For monthly history back to 2010 use price_features() or lag_matrix()."),
                  state, period, cutoff), call. = FALSE)
   }
   if (!is.finite(row$price) || row$price <= 0) {
@@ -83,6 +88,7 @@
     price_sd = NA_real_,
     price_lo = NA_real_,
     price_hi = NA_real_,
+    price_interval_level = NA_real_,
     price_interval_basis = NA_character_,
     regime = "observed",
     provisional = row$data_status == "Preliminary",
@@ -93,6 +99,7 @@
     mapping_vintage = NA_character_,
     within_state_sd = spread$sd,
     n_utility = spread$n_utility,
+    n_utility_year = spread$year,
     confidence_tier = .confidence_tier("B"),
     stringsAsFactors = FALSE,
     row.names = NULL

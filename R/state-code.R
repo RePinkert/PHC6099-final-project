@@ -24,8 +24,8 @@
   }
   if (grepl("^[0-9]{9}$", s) || grepl("^[0-9]{5}(-[0-9]{4})?$", s)) {
     stop(sprintf(paste0(
-      "'%s' looks like a ZIP code. This function takes a US state, because the price series ",
-      "is state-level. Use a two-letter USPS code such as 'FL' (or a full state name). ",
+      "'%s' looks like a ZIP code. This function takes a US state, because its data ",
+      "are state-level. Use a two-letter USPS code such as 'FL' (or a full state name). ",
       "For ZCTA-level health data use health_measure()."), s),
       call. = FALSE)
   }

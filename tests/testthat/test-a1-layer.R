@@ -35,8 +35,8 @@ test_that("A1 state price reproduces the shipped state annual table", {
 
 test_that("A1 vendor boundary: final years only, 2026 early vintage refused", {
   expect_error(lifewatt:::.state_annual_price("FL", 2026),
-               "2026 early vintage intentionally not vendored", fixed = TRUE)
-  expect_error(lifewatt:::.state_annual_price("FL", 2022), "No vendored EIA-861", fixed = TRUE)
+               "only final EIA releases are shipped, so not 2026", fixed = TRUE)
+  expect_error(lifewatt:::.state_annual_price("FL", 2022), "No utility-level EIA-861 annual price for 2022", fixed = TRUE)
   expect_error(lifewatt:::.state_annual_price("ZZ", 2024), "Unknown state", fixed = TRUE)
   expect_error(lifewatt:::.state_annual_price("FL", c(2024, 2025)), "exactly one", fixed = TRUE)
   ## ZIP 形状在 A1 层同样被指名拒绝

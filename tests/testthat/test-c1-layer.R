@@ -25,7 +25,8 @@ test_that("C1 state-month anchors (State Total incl. State Adjustment)", {
 test_that("C1 outside 2024 returns NA row + honest note (survey not extended)", {
   a <- lifewatt:::.c1_at("FL", "2026-07")
   expect_true(is.na(a$c1_disconnections_per_1k))
-  expect_true(is.na(a$c1_source))
+  expect_match(a$c1_source, "not available for 2026-07", fixed = TRUE)
+  expect_match(a$c1_source, "EIA-112 covers 2024-01..2024-12 only", fixed = TRUE)
   n <- lifewatt:::.c1_note("FL", "2026-07")
   expect_match(n, "EIA-112 covers 2024 only", fixed = TRUE)
   expect_match(n, "not extended", fixed = TRUE)

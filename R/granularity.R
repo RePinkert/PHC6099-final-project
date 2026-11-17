@@ -9,7 +9,7 @@
 
 .tier_label <- c(
   A = "A: observed at the reported granularity",
-  B = "B: observed, but coarser than the ZIP (state value, or a blend of several utilities' prices)",
+  B = "B: observed state-level value (a blend of the state's utilities; a household's own utility can differ)",
   C = "C: modeled or synthetic estimate"
 )
 

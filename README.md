@@ -28,12 +28,12 @@ You can install the development version from GitHub with:
 devtools::install_github("RePinkert/PHC6099-final-project", ref = "develop")
 ```
 
-The seven public functions reached `develop` one at a time, each as its own
-commit: foundation, `electricity_price`, `electricity_price_trend`,
-`expected_life_loss`, `my_electricity`, `life_expectancy`,
-`life_expectancy_trend`, `health_measure`. Every commit is buildable and
-checkable on its own; tags `slice/S0` through `slice/S6` mark the first six
-slices, and `health_measure` landed as its own commit after them.
+The package exports nine functions, built in slices that each reached
+`develop` as their own buildable, checkable commit: a foundation slice, then
+`electricity_price`, `electricity_price_trend`, `expected_life_loss`,
+`my_electricity`, `life_expectancy` and `life_expectancy_trend` (tags
+`slice/S0` through `slice/S6`), then `health_measure`, and later
+(2026-11-17) `price_features` and `lag_matrix`.
 
 ## Main interfaces
 
@@ -53,7 +53,7 @@ electricity_price_trend("FL", period = "mom")
 # plain-language price features for the last 12 months: the price itself, the
 # typical price over 3/6/12 months, the change against last month and against
 # the same month a year earlier, the recent trend, and where the month sits
-# against the state's annual price (all observed, cents/kWh and %)
+# against its trailing 12-month average (all observed, cents/kWh and %)
 price_features("FL")
 price_features("FL", period = "2026-07")
 price_features("FL", from = "2024-01", to = "2024-12")
@@ -109,7 +109,7 @@ tier A:
 | tier | meaning | where |
 |---|---|---|
 | A | observed at the reported granularity | **no member**: the package has no ZIP-level observation |
-| B | observed, but coarser than the ZIP | annual and monthly price (state), price trends |
+| B | observed state-level value (blend of the state's utilities) | annual and monthly price (state), price trends |
 | C | modeled or synthetic | forecast months, `life_expectancy()`, `health_measure()` |
 
 **What "state-level" costs, stated in the output.** The annual row carries the
@@ -293,7 +293,7 @@ but not always, cover the same area; `level = "zcta"` and
   shipped ledger actually measures; marginal per-horizon, not joint over h=1..5).
   Observed months keep those three columns `NA` — a measured month has no
   forecast band.
-- `delta_le` has no sourced elasticity yet (as of 2026-11-18 contract); it is a
+- `delta_le` has no sourced elasticity yet (declared contract); it is a
   caller-supplied sensitivity parameter and the output labels it as such.
 - EIA-112 disconnection mechanism data covers 2024 only.
 - `health_measure()` is the only interface that is not served from a shipped

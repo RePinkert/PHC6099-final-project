@@ -34,7 +34,7 @@
       c1_disconnections_per_1k = NA_real_,
       c1_reconnections_per_1k = NA_real_,
       c1_res_customers = NA_real_,
-      c1_source = NA_character_,
+      c1_source = sprintf("not available for %s: Form EIA-112 covers 2024-01..2024-12 only", period),
       stringsAsFactors = FALSE
     )
   }

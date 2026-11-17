@@ -18,25 +18,31 @@
 #'   measured state price (observed regime).
 #' @param meas_sd Declared sd of the local price measurement (cents/kWh).
 #' @return A one-row data.frame with the price estimate, implied usage, evidence
-#'   columns, C1 disconnection mechanism columns (per-1k rates, Form EIA-112
-#'   2024 State Total; NA outside 2024) and full provenance
-#'   (source/level/degraded_from/mapping_vintage/provisional). In the predicted
-#'   regime the row also carries the model interval (`price_lo`/`price_hi`, with
-#'   its `price_interval_basis` declaration); in the observed regime those three
-#'   are NA because a measured month has no forecast band.
+#'   columns, C1 utility disconnection columns (monthly counts per 1,000
+#'   residential customers, Form EIA-112 2024 State Total; NA outside 2024, with `c1_source` saying why) and full
+#'   provenance (source/level/degraded_from/mapping_vintage/provisional).
+#'   `within_state_sd` and `n_utility` come from the EIA-861 utility table of
+#'   year `n_utility_year` (the latest released year not after `time`). In the
+#'   predicted regime the row also carries the model interval
+#'   (`price_lo`/`price_hi`, a nominal 85% interval given in
+#'   `price_interval_level`, with its `price_interval_basis` declaration).
+#'   The forecast has run low in calibration (the truth was a median 1.7% to
+#'   5.2% above it, growing with the horizon) and is not bias-corrected, so a
+#'   forecast below the last observed month is not by itself evidence of a
+#'   price fall; in
+#'   the observed regime those four and `price_sd` are NA because a measured
+#'   month has no forecast band.
 #' @export
 #'
 #' @examples
-#' \dontrun{
 #' my_electricity("FL", time = "2026-07")
 #' my_electricity("FL", bill = 180, time = "2026-12")
-#' }
 my_electricity <- function(state, bill = NULL, time, usage = NULL, meas_sd = 1) {
   base <- .price_at(state, time)
   if (!is.numeric(meas_sd) || length(meas_sd) != 1L || !is.finite(meas_sd) || meas_sd <= 0) {
     stop("meas_sd must be a positive number (declared measurement sd, cents/kWh).", call. = FALSE)
   }
-  ev <- .bill_evidence(base$price, base$price_sd, bill, usage, meas_sd)
+  ev <- .bill_evidence(base$price, base$price_sd, bill, usage, meas_sd, base$within_state_sd)
   notes <- c(
     if (nzchar(ev$note)) ev$note else character(0),
     .c1_note(base$state, base$period),

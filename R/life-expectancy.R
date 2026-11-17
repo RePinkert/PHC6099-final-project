@@ -11,10 +11,22 @@
   max(.vsrr_state_cache()$quarter)
 }
 
-.quarter_shift <- function(quarter, k) {
-  if (!grepl("^[0-9]{4}Q[1-4]$", quarter)) {
-    stop(sprintf("Invalid quarter: %s (expects YYYY-Qn).", quarter), call. = FALSE)
+## 季度归一化：'2024Q4' / '2024-Q4' / '2024q4' / ' 2024 Q4 ' -> '2024Q4'
+.quarter_key <- function(quarter) {
+  if (is.null(quarter) || length(quarter) != 1L || is.na(quarter)) {
+    stop("quarter expects exactly one value such as '2024Q4'.", call. = FALSE)
   }
+  q <- toupper(gsub("[[:space:]]", "", as.character(quarter)))
+  m <- regmatches(q, regexec("^([0-9]{4})-?Q([1-4])$", q))[[1]]
+  if (length(m) != 3L) {
+    stop(sprintf("Invalid quarter: %s (expects a quarter such as '2024Q4'; '2024-Q4' is also accepted).",
+                 as.character(quarter)), call. = FALSE)
+  }
+  paste0(m[2], "Q", m[3])
+}
+
+.quarter_shift <- function(quarter, k) {
+  quarter <- .quarter_key(quarter)
   y <- as.integer(substr(quarter, 1L, 4L))
   n <- as.integer(substr(quarter, 6L, 6L))
   t <- y * 4L + (n - 1L) + k
@@ -35,26 +47,38 @@
 #' only be used to select the state.
 #'
 #' @param state A two-letter USPS state code (`"FL"`) or a full state name.
-#' @param quarter A quarter ("YYYY-Qn"); default: the latest VSRR quarter shipped.
+#' @param quarter A quarter such as `"2024Q4"` (`"2024-Q4"` is also accepted);
+#'   default: the latest VSRR quarter shipped.
 #' @return A one-row data.frame with `e0_synth`, `e0_anchor` (NCHS national),
 #'   `delta_e1`, the state mortality index `m_index`, premature-mortality metrics
-#'   (`ypll75_per_1k`, `prop_died_before_75`), an `estimate_type` label and full
-#'   provenance columns (source/level/degraded_from/mapping_vintage/provisional)
-#'   plus the `sensitivity_assumption` declaration.
+#'   (`ypll75_per_1k`, `ypll75_years_per_person`, `prop_died_before_75`), an
+#'   `estimate_type` label and full provenance columns
+#'   (source/level/degraded_from/mapping_vintage/provisional) plus the
+#'   `sensitivity_assumption` declaration.
+#'
+#'   `e0_synth` is the national anchor `e0_anchor` plus the state's distance
+#'   from the national death rate. The anchor is the NCHS national life
+#'   expectancy for the quarter's year (2023: 78.4, 2024: 79.0; 2025 quarters
+#'   reuse 2024), so every state moves up by about 0.6 years between 2023Q4
+#'   and 2024Q1 for that reason alone. Compare states within a quarter, or use
+#'   [life_expectancy_trend()] for a state's change over time.
+#'
+#'   `ypll75_per_1k` is a life-table quantity: years of life lost before age
+#'   75 per 1,000 **newborns** of the synthetic cohort (so a value near 4,000
+#'   means about 4 years per person). It is not the population-based YPLL rate
+#'   that CDC publishes per 1,000 or 100,000 residents, and the two are not
+#'   comparable. `ypll75_years_per_person` is the same number divided by
+#'   1,000.
 #' @export
 #'
 #' @examples
-#' \dontrun{
 #' life_expectancy("FL")
 #' life_expectancy("FL", quarter = "2024Q4")
-#' }
 life_expectancy <- function(state, quarter = NULL) {
   state <- .state_code(state)
   if (is.null(quarter)) quarter <- .vsrr_latest_quarter()
-  if (!grepl("^[0-9]{4}Q[1-4]$", as.character(quarter))) {
-    stop(sprintf("Invalid quarter: %s (expects YYYY-Qn).", quarter), call. = FALSE)
-  }
-  s <- .le_synth(state, as.character(quarter), "12m")
+  quarter <- .quarter_key(quarter)
+  s <- .le_synth(state, quarter, "12m")
   data.frame(
     state = state,
     quarter = s$quarter,
@@ -65,6 +89,7 @@ life_expectancy <- function(state, quarter = NULL) {
     m_index = s$m_index,
     rate_state_per_100k = s$rate_state_per_100k,
     ypll75_per_1k = s$ypll75_per_1k,
+    ypll75_years_per_person = s$ypll75_per_1k / 1000,
     prop_died_before_75 = s$prop_died_before_75,
     estimate_type = "synthetic_e0 (mortality-based D1b/D2 sensitivity synthesis; not an NCHS-published subnational life expectancy)",
     source = s$source,

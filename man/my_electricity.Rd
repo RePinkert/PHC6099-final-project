@@ -23,12 +23,20 @@ measured state price (observed regime).}
 }
 \value{
 A one-row data.frame with the price estimate, implied usage, evidence
-columns, C1 disconnection mechanism columns (per-1k rates, Form EIA-112
-2024 State Total; NA outside 2024) and full provenance
-(source/level/degraded_from/mapping_vintage/provisional). In the predicted
-regime the row also carries the model interval (\code{price_lo}/\code{price_hi}, with
-its \code{price_interval_basis} declaration); in the observed regime those three
-are NA because a measured month has no forecast band.
+columns, C1 utility disconnection columns (monthly counts per 1,000
+residential customers, Form EIA-112 2024 State Total; NA outside 2024, with \code{c1_source} saying why) and full
+provenance (source/level/degraded_from/mapping_vintage/provisional).
+\code{within_state_sd} and \code{n_utility} come from the EIA-861 utility table of
+year \code{n_utility_year} (the latest released year not after \code{time}). In the
+predicted regime the row also carries the model interval
+(\code{price_lo}/\code{price_hi}, a nominal 85\% interval given in
+\code{price_interval_level}, with its \code{price_interval_basis} declaration).
+The forecast has run low in calibration (the truth was a median 1.7\% to
+5.2\% above it, growing with the horizon) and is not bias-corrected, so a
+forecast below the last observed month is not by itself evidence of a
+price fall; in
+the observed regime those four and \code{price_sd} are NA because a measured
+month has no forecast band.
 }
 \description{
 Energy-side view of the \code{\link[=expected_life_loss]{expected_life_loss()}} machinery: the price estimate at
@@ -37,8 +45,6 @@ with \code{bill} treated as Bayesian evidence (descriptive by itself; posterior 
 \code{usage} is also supplied).
 }
 \examples{
-\dontrun{
 my_electricity("FL", time = "2026-07")
 my_electricity("FL", bill = 180, time = "2026-12")
-}
 }

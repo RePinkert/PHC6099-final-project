@@ -73,7 +73,7 @@ test_that("time contract: the supported window is enforced at the UX layer", {
   expect_s3_class(expected_life_loss(anchor_state_fl, "2023-01"), "data.frame")
   expect_error(expected_life_loss(anchor_state_fl, "2026-13"), "Invalid month", fixed = TRUE)
   expect_error(expected_life_loss(anchor_state_fl, "foo"), "Invalid time", fixed = TRUE)
-  expect_error(expected_life_loss(anchor_state_fl, NA), "Invalid time", fixed = TRUE)
+  expect_error(expected_life_loss(anchor_state_fl, NA), "time is NA", fixed = TRUE)
   expect_error(expected_life_loss(anchor_state_fl, c("2026-06", "2026-07")), "exactly one", fixed = TRUE)
 })
 
@@ -105,7 +105,7 @@ test_that("quarter / year / period contracts refuse shape violations", {
   expect_error(life_expectancy(anchor_state_fl, quarter = "24Q1"), "Invalid quarter", fixed = TRUE)
   expect_error(electricity_price(anchor_state_fl, period = "yoy"), "Unknown period", fixed = TRUE)
   expect_error(electricity_price(anchor_state_fl, year = 2024, period = "mom"), "not both", fixed = TRUE)
-  expect_error(life_expectancy_trend(anchor_state_fl, period = "mom"), "should be one of")
+  expect_error(life_expectancy_trend(anchor_state_fl, period = "mom"), "quarterly", fixed = TRUE)
 })
 
 test_that("state input itself is validated (scalar, known, not NA)", {

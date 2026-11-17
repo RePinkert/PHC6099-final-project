@@ -9,14 +9,30 @@ life_expectancy(state, quarter = NULL)
 \arguments{
 \item{state}{A two-letter USPS state code (\code{"FL"}) or a full state name.}
 
-\item{quarter}{A quarter ("YYYY-Qn"); default: the latest VSRR quarter shipped.}
+\item{quarter}{A quarter such as \code{"2024Q4"} (\code{"2024-Q4"} is also accepted);
+default: the latest VSRR quarter shipped.}
 }
 \value{
 A one-row data.frame with \code{e0_synth}, \code{e0_anchor} (NCHS national),
 \code{delta_e1}, the state mortality index \code{m_index}, premature-mortality metrics
-(\code{ypll75_per_1k}, \code{prop_died_before_75}), an \code{estimate_type} label and full
-provenance columns (source/level/degraded_from/mapping_vintage/provisional)
-plus the \code{sensitivity_assumption} declaration.
+(\code{ypll75_per_1k}, \code{ypll75_years_per_person}, \code{prop_died_before_75}), an
+\code{estimate_type} label and full provenance columns
+(source/level/degraded_from/mapping_vintage/provisional) plus the
+\code{sensitivity_assumption} declaration.
+
+\code{e0_synth} is the national anchor \code{e0_anchor} plus the state's distance
+from the national death rate. The anchor is the NCHS national life
+expectancy for the quarter's year (2023: 78.4, 2024: 79.0; 2025 quarters
+reuse 2024), so every state moves up by about 0.6 years between 2023Q4
+and 2024Q1 for that reason alone. Compare states within a quarter, or use
+\code{\link[=life_expectancy_trend]{life_expectancy_trend()}} for a state's change over time.
+
+\code{ypll75_per_1k} is a life-table quantity: years of life lost before age
+75 per 1,000 \strong{newborns} of the synthetic cohort (so a value near 4,000
+means about 4 years per person). It is not the population-based YPLL rate
+that CDC publishes per 1,000 or 100,000 residents, and the two are not
+comparable. \code{ypll75_years_per_person} is the same number divided by
+1,000.
 }
 \description{
 Returns a \strong{synthetic} life-expectancy estimate for a state: the D1b/D2
@@ -32,8 +48,6 @@ Takes a state, not a ZIP code: the VSRR source is state-level, so a ZIP would
 only be used to select the state.
 }
 \examples{
-\dontrun{
 life_expectancy("FL")
 life_expectancy("FL", quarter = "2024Q4")
-}
 }

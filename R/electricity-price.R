@@ -28,6 +28,7 @@
     mapping_vintage = rep(NA_character_, n),
     within_state_sd = vapply(sp, function(x) x$sd, numeric(1)),
     n_utility = vapply(sp, function(x) as.integer(x$n_utility), integer(1)),
+    n_utility_year = vapply(sp, function(x) as.integer(x$year), integer(1)),
     confidence_tier = rep(.confidence_tier("B"), n),
     stringsAsFactors = FALSE,
     row.names = NULL
@@ -58,16 +59,22 @@
 #'   `confidence_tier` label; one row for the annual regime (with `price_min`,
 #'   `price_max` and `n_utility` for the state's utilities), 43 rows for the
 #'   monthly series (with `within_state_sd`, the customer-weighted spread of
-#'   utility prices inside the state).
+#'   utility prices inside the state, `n_utility`, and `n_utility_year`, the
+#'   EIA-861 year those two come from: the latest released year not after the
+#'   month).
+#'
+#'   The annual price and the monthly series are built differently: the annual
+#'   value is a customer-weighted mean of utility prices, the monthly value is
+#'   state revenue divided by state sales. In most states they agree within a
+#'   few percent, but in some they sit up to about 16% apart on a yearly average (Texas 2024: 12.9 annual vs
+#'   15.0 monthly average), so compare like with like.
 #' @seealso [electricity_price_trend()], [my_electricity()]
 #' @export
 #'
 #' @examples
-#' \dontrun{
 #' electricity_price("FL", year = 2024)
 #' electricity_price("FL", period = "mom")
 #' electricity_price("Florida", year = 2024)
-#' }
 electricity_price <- function(state, year = NULL, period = NULL) {
   if (is.null(year) && is.null(period)) {
     stop(paste0("Provide either year (2023-2025 annual, state-level) or period = \"mom\" ",
@@ -78,6 +85,7 @@ electricity_price <- function(state, year = NULL, period = NULL) {
   }
   state <- .state_code(state)
   if (!is.null(year)) return(.state_annual_price(state, year))
+  if (is.character(period) && length(period) == 1L) period <- tolower(trimws(period))
   if (!identical(period, "mom")) {
     stop(sprintf("Unknown period: %s (expects 'mom').", period), call. = FALSE)
   }

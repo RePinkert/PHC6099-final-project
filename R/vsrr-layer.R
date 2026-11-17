@@ -38,7 +38,7 @@
   hit <- d[d$state == state & d$quarter == quarter &
              d$period_type == period_type & d$rate_type == rate_type, ]
   if (nrow(hit) != 1L) {
-    stop(sprintf("VSRR has no %s/%s record for state %s at %s (window 2023Q1..2025Q3).",
+    stop(sprintf("No CDC VSRR death rate (%s, %s) for %s at %s (shipped quarters: window 2023Q1..2025Q3).",
                  period_type, rate_type, state, quarter), call. = FALSE)
   }
   hit

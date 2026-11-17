@@ -37,13 +37,20 @@
 
 .state_annual_price <- function(state, year) {
   state <- .state_code(state)
-  year <- as.integer(year)
-  if (length(year) != 1L || is.na(year)) stop("year expects exactly one integer year.", call. = FALSE)
+  if (length(year) != 1L) stop("year expects exactly one integer year.", call. = FALSE)
+  y_num <- suppressWarnings(as.numeric(year))
+  if (!is.finite(y_num) || y_num != trunc(y_num)) {
+    stop(sprintf("year expects a whole year such as 2024 (got %s).", format(year)), call. = FALSE)
+  }
+  year <- as.integer(y_num)
   avail <- .annual_years()
   if (!year %in% avail) {
+    hint <- if (year >= 2010L && year <= max(avail)) sprintf(paste0(
+      " The state annual price alone is available as price_features(\"%s\", period = \"%d-01\")$annual_price."),
+      state, year) else ""
     stop(sprintf(
-      "No vendored EIA-861 annual table for %d (available: %s). 2026 early vintage intentionally not vendored; candidate-list prescribes final releases.",
-      year, paste(avail, collapse = "/")), call. = FALSE)
+      "No utility-level EIA-861 annual price for %d (available: %s; only final EIA releases are shipped, so not 2026).%s Monthly prices back to 2010 are in price_features().",
+      year, paste(avail, collapse = "/"), hint), call. = FALSE)
   }
   s <- .state_utility_rows(state, year)
   if (nrow(s) == 0L) {

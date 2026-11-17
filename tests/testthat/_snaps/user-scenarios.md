@@ -20,7 +20,7 @@
       tryCatch(expected_life_loss(anchor_zip_fl, "2026-07"), error = function(e) e)$
         message
     Output
-      [1] "'32601' looks like a ZIP code. This function takes a US state, because the price series is state-level. Use a two-letter USPS code such as 'FL' (or a full state name). For ZCTA-level health data use health_measure()."
+      [1] "'32601' looks like a ZIP code. This function takes a US state, because its data are state-level. Use a two-letter USPS code such as 'FL' (or a full state name). For ZCTA-level health data use health_measure()."
 
 ---
 
@@ -44,7 +44,7 @@
       tryCatch(life_expectancy(anchor_state_fl, quarter = "2024-06"), error = function(
         e) e)$message
     Output
-      [1] "Invalid quarter: 2024-06 (expects YYYY-Qn)."
+      [1] "Invalid quarter: 2024-06 (expects a quarter such as '2024Q4'; '2024-Q4' is also accepted)."
 
 ---
 
