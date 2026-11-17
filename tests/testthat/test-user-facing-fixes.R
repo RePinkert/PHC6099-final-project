@@ -129,3 +129,15 @@ test_that("round 3: forecast bias is disclosed and silly inputs are caught", {
   expect_warning(lag_matrix(anchor_state_fl, lags = c(0, 200)), "200 reach before", fixed = TRUE)
   expect_silent(lag_matrix(anchor_state_fl))
 })
+
+test_that("the utility range ignores retailers with a handful of customers", {
+  mi <- electricity_price("MI", year = 2023)
+  expect_lt(mi$price_max, 100)          # was 285 c/kWh from a 1-customer entity
+  nm <- electricity_price("NM", year = 2024)
+  expect_gt(nm$price_min, 5)            # was 2.69 c/kWh from a 3-customer entity
+  expect_lt(nm$n_utility_in_range, nm$n_utility)
+  for (st in c("FL", "DC", "AK", "HI", "TX")) {
+    r <- electricity_price(st, year = 2024)
+    expect_true(r$price_min <= r$price && r$price <= r$price_max, label = st)
+  }
+})

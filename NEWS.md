@@ -1,5 +1,18 @@
 # lifewatt 0.0.0.9000
 
+* **第三轮检查后的两项修复（2026-11-17）**：
+  - `electricity_price(year =)` 的 `price_min` / `price_max` 只看居民客户 >= 100 户的 utility，
+    新列 `n_utility_in_range` 给出参与范围的家数；`price` 与 `n_utility` 仍用全部 utility（与随包州年价表逐位一致）。
+    原来范围会被个位数客户的实体定下：MI 2023 最高价 285 c/kWh（Sunnova，1 户）-> 25.4；
+    NM 2024 最低价 2.69（Tesla Inc.，3 户）-> 8.91；FL 2024 最低价 6.98（Tesla，12 户）-> 10.83。
+    25 个州的范围因此改变；所有州 × 年的加权均价仍落在新范围内。
+  - vignette 重写为可运行版本：原来所有代码块都是 `eval = FALSE`，渲染后没有任何输出，且缺
+    `price_features()` / `lag_matrix()`，还写着"每个州级行都带 `within_state_sd`"（年度行与 price_features 没有）。
+    现在按"多少钱 / 在涨吗 / 这个月贵不贵 / 会多少钱、账单说明什么 / 预期寿命 / 寿命损失 / ZIP 健康指标 / 出处与拒绝"
+    组织，除需联网的 `health_measure()` 外全部实际运行并以表格显示结果。
+  - `health_measure()` 的示例从 `\donttest` 改回 `\dontrun`：`--as-cran` 会运行 `\donttest` 示例，
+    data.cdc.gov 一次超时（60 秒）就让 check 报 ERROR。要联网的示例不应让 check 依赖网络。
+
 * **用户侧测试修复（2026-11-17）**：按用户方式调用 9 个导出函数后发现的问题，逐条修正，不动数据与模型。
   - `life_expectancy()` / `life_expectancy_trend()`：文档写的是 `"YYYY-Qn"`，代码却只认 `"2024Q4"`。
     现在 `"2024Q4"`、`"2024-Q4"`、`"2024q4"` 都接受并归一化，报错文案给出实例。

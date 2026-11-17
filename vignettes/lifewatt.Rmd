@@ -9,6 +9,9 @@ vignette: >
 
 ```{r setup, include = FALSE}
 knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+show <- function(x, cols, digits = 2) {
+  knitr::kable(x[, intersect(cols, names(x)), drop = FALSE], digits = digits, row.names = FALSE)
+}
 ```
 
 ## Overview
@@ -16,87 +19,189 @@ knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
 `lifewatt` reports environmental justice indicators at the granularity each
 source actually publishes:
 
-- **by state** — residential electricity price (observed EIA-861 annual and EIA
-  B1 monthly series) with YoY / MoM trends, bill-as-evidence price views, and an
-  expected life-expectancy loss view anchored to published national life tables
-  (NCHS), where any life-expectancy translation is a caller-supplied sensitivity
-  parameter;
-- **by state** — a synthetic life-expectancy estimate (state mortality rates +
-  national life-table anchor; every assumption declared in
-  `sensitivity_assumption`);
-- **by ZCTA** — CDC PLACES adult health prevalence for the ZCTA that matches a
-  ZIP code.
+- **by state**: residential electricity price (EIA-861 annual and EIA-861M
+  monthly), its trends, a forecast with an interval, and what your own bill
+  says about it;
+- **by state**: a synthetic life-expectancy estimate built from state death
+  rates and the national life table, plus an optional declared
+  life-expectancy loss;
+- **by ZIP code** (matched to its ZCTA): CDC PLACES adult health prevalence.
 
 No source publishes a realised average residential price per ZIP code, so the
-price layer takes a state and refuses a ZIP by name.
+price and life-expectancy functions take a state (a two-letter code or a full
+name) and refuse a ZIP by name. Every number in this vignette is computed from
+data shipped with the package, except `health_measure()`, which downloads from
+data.cdc.gov.
 
-## Workflow
+```{r}
+library(lifewatt)
+```
+
+## 1. What does electricity cost in a state?
+
+The annual price is the customer-weighted mean of the state's utilities.
+`price_min` and `price_max` show the cheapest and dearest utility with at least
+100 residential customers, so you can see how far a household's own utility
+might sit from the state value.
+
+```{r}
+annual <- do.call(rbind, lapply(c("FL", "TX", "CA", "HI"), electricity_price, year = 2024))
+show(annual, c("state", "year", "price", "price_min", "price_max", "n_utility"))
+```
+
+The monthly series (2023-01 to 2026-07) flags months that EIA still marks
+Preliminary.
+
+```{r}
+monthly <- electricity_price("FL", period = "mom")
+show(tail(monthly, 4), c("state", "period", "price", "provisional"))
+```
+
+The annual and monthly prices are built differently: the annual one averages
+utility prices, while the monthly one divides state revenue by state sales. In
+most states they agree within a few percent, but not everywhere. Compare like
+with like.
+
+```{r}
+c(annual_2024 = electricity_price("TX", year = 2024)$price,
+  monthly_avg_2024 = mean(price_features("TX", from = "2024-01", to = "2024-12")$price))
+```
+
+## 2. Is it going up?
+
+Year-over-year change of the annual price. `monthly_avg_pct_of_prior` gives the
+same change computed from the monthly series, and `note` says so when the two
+disagree on direction.
+
+```{r}
+show(electricity_price_trend("MA", period = "yoy"),
+     c("state", "year", "pct_of_prior", "monthly_avg_pct_of_prior"))
+```
+
+Month-over-month change:
+
+```{r}
+show(tail(electricity_price_trend("FL", period = "mom"), 3),
+     c("period", "prior_period", "change", "pct_of_prior", "provisional"))
+```
+
+## 3. Is this month expensive?
+
+`price_features()` puts a month in context, in plain units: trailing averages,
+changes against last month and last year, the recent trend, and the month
+against its trailing 12-month average.
+
+```{r}
+pf <- price_features("FL", from = "2026-02", to = "2026-07")
+show(pf, c("period", "price", "avg_12m", "change_12m_pct", "trend_12m", "price_vs_avg12m_pct"))
+```
+
+`lag_matrix()` puts previous months side by side, for plotting or for your own
+model:
+
+```{r}
+show(lag_matrix(c("FL", "GA"), from = "2026-06", lags = c(0, 1, 12)),
+     c("state", "period", "price_now", "price_1m_ago", "price_12m_ago"))
+```
+
+## 4. What will it cost, and what does my bill say?
+
+Months after 2026-07 come from an LSTM forecast. Each forecast row carries a
+nominal 85% interval (`price_lo`, `price_hi`). In calibration the forecast ran
+low, by 1.7% at one month ahead to 5.2% at five months ahead, and it is not
+bias-corrected. A forecast below the last observed month is therefore not, by
+itself, evidence that prices will fall.
+
+```{r}
+fc <- do.call(rbind, lapply(sprintf("2026-%02d", 7:12), function(m) my_electricity("FL", time = m)))
+show(fc, c("period", "regime", "price", "price_lo", "price_hi", "price_interval_level"))
+```
+
+A bill is treated as evidence. A bill on its own gives the usage it implies;
+add the usage and the package turns them into a local price measurement and
+blends it with the forecast (inverse-variance weighting).
+
+```{r}
+bill_only <- my_electricity("FL", bill = 180, time = "2026-12")
+bill_usage <- my_electricity("FL", bill = 180, usage = 1200, time = "2026-12")
+show(rbind(bill_only, bill_usage),
+     c("evidence_regime", "price", "price_meas", "price_posterior", "price_posterior_sd", "implied_usage_kwh"))
+```
+
+When your own price is far from the state price, the row's `notes` say so,
+because your utility may well differ from the state average:
+
+```{r}
+my_electricity("HI", bill = 180, usage = 1200, time = "2026-12")$notes
+```
+
+## 5. Life expectancy
+
+`life_expectancy()` returns a **synthetic** estimate, not an NCHS-published
+state life expectancy. It takes the state's age-adjusted death rate relative to
+the US, applies it to the national age pattern, and anchors the result to the
+national life table. Every assumption is spelled out in
+`sensitivity_assumption`.
+
+```{r}
+le <- do.call(rbind, lapply(c("HI", "FL", "MS"), life_expectancy))
+show(le, c("state", "quarter", "e0_synth", "e0_anchor", "rate_state_per_100k", "prop_died_before_75"))
+```
+
+For change over time, `e0_change_years` reflects the state's own death rates.
+`e0_synth_diff_years` is the plain difference of the two reported values, which
+also picks up changes in the national anchor (78.4 for 2023, 79.0 for 2024).
+
+```{r}
+tr <- life_expectancy_trend("MS", period = "qoq", quarter = "2024Q1")
+show(tr, c("state", "from_quarter", "to_quarter", "rate_change_per_100k",
+           "e0_change_years", "e0_synth_diff_years"), digits = 3)
+```
+
+The death-rate source is quarterly, so the trend periods are `"yoy"` and
+`"qoq"`.
+
+## 6. Expected life-expectancy loss
+
+No sourced US price-to-life-expectancy elasticity exists yet. Without
+`delta_le` the loss columns are therefore left empty. With it, you declare a
+loss yourself (positive = loss, in years) and the package reports it next to
+the price and the national anchor. The closest literature puts an energy-cost
+shock at a loss of 0.7 to 2.7 years.
+
+```{r}
+ell <- expected_life_loss("FL", "2026-12", bill = 180, usage = 1200, delta_le = 1)
+show(ell, c("state", "period", "price", "price_posterior", "e0_anchor",
+            "le_loss_years", "le_loss_pct_of_anchor"))
+```
+
+## 7. Adult health by ZIP code
+
+`health_measure()` is the one function that takes a ZIP code. It downloads the
+CDC PLACES 2025 release (BRFSS 2023 measures) for the matching ZCTA, so it
+needs an internet connection and is not run here.
 
 ```{r eval = FALSE}
-library(lifewatt)
-
-# observed annual price, state-level (customer-weighted across the state's utilities)
-electricity_price("FL", year = 2024)
-
-# state monthly series (2023-01 .. 2026-07; EIA-preliminary months flagged)
-electricity_price("FL", period = "mom")
-
-# trends
-electricity_price_trend("FL", period = "yoy")
-electricity_price_trend("FL", period = "mom")
-
-# price + bill evidence (bill is Bayesian evidence, not a required input)
-my_electricity("FL", bill = 180, time = "2026-12")
-my_electricity("FL", bill = 180, usage = 1200, time = "2026-12")
-
-# expected life-expectancy loss view
-expected_life_loss("FL", "2026-07")
-expected_life_loss("FL", "2026-12", bill = 180, usage = 1200)
-expected_life_loss("FL", "2026-09", delta_le = 0.01)
-
-# adult health estimates for the ZCTA (CDC PLACES 2025 release, BRFSS 2023;
-# downloaded live from data.cdc.gov on each call)
-health_measure("32601")
 health_measure("32601", measure = c("DIABETES", "BPHIGH"))
 ```
 
-Price and life-expectancy functions accept a two-letter USPS code or a full
-state name; a ZIP code is refused by name and the error points at the state
-form. `health_measure()` is the exception: CDC PLACES publishes by ZCTA, so it
-needs a ZIP and says so when handed a state.
-
-## Provenance and honesty contract
+## Provenance and honesty
 
 Every returned row carries provenance columns (`source`, `level`,
-`degraded_from`, `mapping_vintage`, `provisional`). On price and
-life-expectancy rows `level` is always `"state"` and `degraded_from` is always
-`NA`: nothing is degraded from a ZIP, because the interface no longer accepts
-one. `health_measure()` rows are `level = "zcta"` with `degraded_from = "zip"`,
-because a ZIP is treated as the ZCTA with the same five digits.
+`degraded_from`, `mapping_vintage`, `provisional`) and a `confidence_tier`. On
+price and life-expectancy rows `level` is `"state"`. `health_measure()` rows
+are `level = "zcta"` with `degraded_from = "zip"`, because a ZIP is treated as
+the ZCTA with the same five digits.
 
-Months EIA still marks Preliminary are flagged provisional; months after 2026-07
-are served by the LSTM price forecast (`fit_as_of = 2026-07`).
-`health_measure()` is the exception on provenance *epochs* rather than on
-columns: it is the only interface that is not served from a shipped snapshot, so
-its `provisional` flag is always `FALSE` while the bytes come from a live
-query.
+How far the state value can sit from a household's own utility is stated on
+each price row: `price_min` / `price_max` on the annual row, and
+`within_state_sd` (the customer-weighted spread of utility prices) on monthly
+and forecast rows.
 
-The annual row also carries `price_min`, `price_max` and `n_utility` for the
-state's utilities, and every state-level row carries `within_state_sd`. Those
-three numbers are how the package states, per row, how far the state value can
-sit from a particular ZIP.
+Inputs that cannot be answered are refused by name, with a pointer to what will
+work:
 
-`delta_le` is a declared sensitivity parameter, not a sourced elasticity: the
-output labels it in a `sensitivity_assumption` column. Without `delta_le` the
-life-loss columns are withheld. `life_expectancy()` / `life_expectancy_trend()`
-return **synthetic** estimates (mortality-based D1b/D2 sensitivity synthesis);
-the `estimate_type` label states they are not NCHS-published subnational life
-expectancies, and all synthesis assumptions travel in `sensitivity_assumption`.
-The mortality source is quarterly (NCHS VSRR provisional), so trend periods are
-`"yoy"` / `"qoq"` — `"mom"` is refused honestly.
-
-```{r eval = FALSE}
-life_expectancy("FL")
-life_expectancy("FL", quarter = "2024Q4")
-life_expectancy_trend("FL", period = "yoy")
+```{r}
+tryCatch(electricity_price("32601", year = 2024), error = conditionMessage)
+tryCatch(expected_life_loss("FL", "2027-03"), error = conditionMessage)
 ```

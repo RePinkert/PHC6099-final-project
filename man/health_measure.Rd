@@ -41,7 +41,7 @@ so an internet connection is required. A ZIP code is treated as the ZCTA with
 the same five digits; the two usually, but not always, cover the same area.
 }
 \examples{
-\donttest{
+\dontrun{
 health_measure("32601")
 health_measure("32601", measure = c("DIABETES", "BPHIGH"))
 }

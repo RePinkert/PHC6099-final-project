@@ -40,12 +40,15 @@
 #' Returns the state-level residential electricity price. The annual value is
 #' the customer-weighted mean of the state's EIA-861 utility prices (final
 #' releases 2023-2025), with the cheapest and dearest utility in the state
-#' reported alongside it; the monthly series is the B1 state-level retail-sales
+#' reported alongside it (only utilities with at least 100 residential
+#' customers count for that range, so a retailer with a handful of customers
+#' cannot set it); the monthly series is the B1 state-level retail-sales
 #' cache (2023-01 to 2026-07), and months EIA marks Preliminary are provisional.
 #'
 #' This function takes a state, not a ZIP code: no source publishes a realised
 #' average residential price per ZIP, so every ZIP in a state would return the
-#' same number. Read `price_min` / `price_max` / `within_state_sd` as the
+#' same number. Read `price_min` / `price_max` (annual row) or `within_state_sd`
+#' (monthly rows) as the
 #' declared distance between the state value and the utilities inside it.
 #'
 #' @param state A two-letter USPS state code (`"FL"`) or a full state name
@@ -56,8 +59,10 @@
 #' @param period Pass `"mom"` for the state-level monthly series (43 rows).
 #' @return A data.frame with the price (cents/kWh), the provenance columns
 #'   (`source`/`level`/`degraded_from`/`mapping_vintage`/`provisional`) and a
-#'   `confidence_tier` label; one row for the annual regime (with `price_min`,
-#'   `price_max` and `n_utility` for the state's utilities), 43 rows for the
+#'   `confidence_tier` label; one row for the annual regime (with `price_min`
+#'   and `price_max`, the cheapest and dearest utility among those with at
+#'   least 100 residential customers, `n_utility_in_range` for how many those
+#'   are, and `n_utility` for all priced utilities behind `price`), 43 rows for the
 #'   monthly series (with `within_state_sd`, the customer-weighted spread of
 #'   utility prices inside the state, `n_utility`, and `n_utility_year`, the
 #'   EIA-861 year those two come from: the latest released year not after the

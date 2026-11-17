@@ -113,8 +113,10 @@ tier A:
 | C | modeled or synthetic | forecast months, `life_expectancy()`, `health_measure()` |
 
 **What "state-level" costs, stated in the output.** The annual row carries the
-customer-weighted mean of the state's EIA-861 utility prices, plus `price_min`,
-`price_max` and `n_utility` for that same set. The gap between a ZIP's own
+customer-weighted mean of the state's EIA-861 utility prices (`n_utility`
+utilities), plus `price_min` and `price_max`: the cheapest and dearest utility
+with at least 100 residential customers (`n_utility_in_range` of them), so a
+retailer with a handful of customers cannot set the range. The gap between a ZIP's own
 utility price and the state mean is the price of the simplification: measured on
 the shipped tables it is **7.5% at the median and 25.8% at p90**
 (`model_traning/HANDOVER_confidence.md`, layer L1). `within_state_sd` (the

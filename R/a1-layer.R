@@ -3,9 +3,12 @@
 #
 # 口径（W0，2026-11）：
 #   price      = 该州全部居民 utility 的客户加权均价（= eia861_state_annual 的同一定义）
-#   price_min  = 该州最便宜的居民 utility 年价
-#   price_max  = 该州最贵的居民 utility 年价
-#   n_utility  = 参与以上三个数的 utility 行数
+#   price_min  = 该州最便宜的居民 utility 年价（只看居民客户 >= 100 户的 utility）
+#   price_max  = 该州最贵的居民 utility 年价（同上）
+#   n_utility  = 参与 price 的 utility 行数；n_utility_in_range = 参与 min/max 的行数
+# 2026-11-17：min/max 曾被个位数客户的实体带偏（MI 2023 Sunnova 1 户 285 c/kWh，
+# NM 2024 Tesla 3 户 2.69），所以范围只取 >= .range_customer_floor 户的 utility；
+# 客户加权均价不受影响（这些实体的权重本来就可忽略），仍用全部行。
 # 后三者是**描述性**的：它们声明"州值离某个 ZIP 的真实价可能有多远"，不参与任何加权。
 # ZIP 内的人口份额混合（v1 的 .zip_shares / weight_basis / share_overlap_frac）已删除：
 # 见 docs/confidence-plan.md 的 D1。
@@ -28,6 +31,8 @@
 
 ## 该州某年的居民 utility 行（排除 EIA 的 "Adjustment YYYY" 伪 utility 99999，
 ## 以及价格/客户数不可用的行）——price 与 min/max 必须取自同一个集合，否则两者不可比
+.range_customer_floor <- 100L
+
 .state_utility_rows <- function(state, year) {
   slim <- .annual_slim()
   s <- slim[slim$year == year & slim$state == state & slim$eiaid != "99999" &
@@ -56,13 +61,16 @@
   if (nrow(s) == 0L) {
     stop(sprintf("No priced EIA-861 utility in %s for %d.", state, year), call. = FALSE)
   }
+  r <- s[s$cus >= .range_customer_floor, ]
+  if (nrow(r) == 0L) r <- s
   data.frame(
     state = state,
     year = year,
     price = stats::weighted.mean(s$price, s$cus),
-    price_min = min(s$price),
-    price_max = max(s$price),
+    price_min = min(r$price),
+    price_max = max(r$price),
     n_utility = nrow(s),
+    n_utility_in_range = nrow(r),
     unit = "cents/kWh",
     regime = "observed",
     provisional = FALSE,

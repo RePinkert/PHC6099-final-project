@@ -49,7 +49,7 @@
 #' @export
 #'
 #' @examples
-#' \donttest{
+#' \dontrun{
 #' health_measure("32601")
 #' health_measure("32601", measure = c("DIABETES", "BPHIGH"))
 #' }

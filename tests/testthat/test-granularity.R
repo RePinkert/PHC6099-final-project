@@ -14,8 +14,9 @@ test_that("the state value is the whole answer, and no ZIP is weighted anywhere"
 test_that("annual state price reports the utility range, not just a point", {
   r <- lifewatt:::.state_annual_price("FL", 2024)
   s <- lifewatt:::.state_utility_rows("FL", 2024)
-  expect_equal(r$price_min, min(s$price))
-  expect_equal(r$price_max, max(s$price))
+  expect_equal(r$price_min, min(s$price[s$cus >= 100]))
+  expect_equal(r$price_max, max(s$price[s$cus >= 100]))
+  expect_equal(r$n_utility_in_range, sum(s$cus >= 100))
   expect_true(r$price_min < r$price_max)
   expect_true(r$price_min <= r$price && r$price <= r$price_max)
   expect_match(r$confidence_tier, "^B:")

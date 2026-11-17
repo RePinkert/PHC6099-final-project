@@ -1,5 +1,5 @@
 # test-a1-layer.R —— A1 年度层：州年价（W0 起不再有 ZIP 混合）
-# 契约：price 与 price_min/max/n_utility 必须取自**同一个** utility 集合（该州的居民 utility，
+# 契约：price 与 n_utility 取自同一个 utility 集合，price_min/max 取其中居民客户 >= 100 户的子集（该州的居民 utility，
 # 排除 EIA 的 99999 调整伪 utility），否则"州值 vs 州内范围"不可比。
 
 test_that("A1 state annual price is the customer-weighted mean of the state's utilities", {
@@ -9,8 +9,9 @@ test_that("A1 state annual price is the customer-weighted mean of the state's ut
   s <- lifewatt:::.state_utility_rows("FL", 2024)
   expect_gt(nrow(s), 2L)
   expect_equal(r$price, stats::weighted.mean(s$price, s$cus), tolerance = 1e-9)
-  expect_equal(r$price_min, min(s$price))
-  expect_equal(r$price_max, max(s$price))
+  expect_equal(r$price_min, min(s$price[s$cus >= 100]))
+  expect_equal(r$price_max, max(s$price[s$cus >= 100]))
+  expect_equal(r$n_utility_in_range, sum(s$cus >= 100))
   expect_equal(r$n_utility, nrow(s))
   ## 不变量：客户加权均值必落在 min/max 之间（W0 的 A3 判据，单州版本）
   expect_true(r$price_min <= r$price && r$price <= r$price_max)

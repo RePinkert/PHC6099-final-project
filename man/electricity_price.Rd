@@ -19,8 +19,10 @@ estimate.}
 \value{
 A data.frame with the price (cents/kWh), the provenance columns
 (\code{source}/\code{level}/\code{degraded_from}/\code{mapping_vintage}/\code{provisional}) and a
-\code{confidence_tier} label; one row for the annual regime (with \code{price_min},
-\code{price_max} and \code{n_utility} for the state's utilities), 43 rows for the
+\code{confidence_tier} label; one row for the annual regime (with \code{price_min}
+and \code{price_max}, the cheapest and dearest utility among those with at
+least 100 residential customers, \code{n_utility_in_range} for how many those
+are, and \code{n_utility} for all priced utilities behind \code{price}), 43 rows for the
 monthly series (with \code{within_state_sd}, the customer-weighted spread of
 utility prices inside the state, \code{n_utility}, and \code{n_utility_year}, the
 EIA-861 year those two come from: the latest released year not after the
@@ -36,13 +38,16 @@ few percent, but in some they sit up to about 16\% apart on a yearly average (Te
 Returns the state-level residential electricity price. The annual value is
 the customer-weighted mean of the state's EIA-861 utility prices (final
 releases 2023-2025), with the cheapest and dearest utility in the state
-reported alongside it; the monthly series is the B1 state-level retail-sales
+reported alongside it (only utilities with at least 100 residential
+customers count for that range, so a retailer with a handful of customers
+cannot set it); the monthly series is the B1 state-level retail-sales
 cache (2023-01 to 2026-07), and months EIA marks Preliminary are provisional.
 }
 \details{
 This function takes a state, not a ZIP code: no source publishes a realised
 average residential price per ZIP, so every ZIP in a state would return the
-same number. Read \code{price_min} / \code{price_max} / \code{within_state_sd} as the
+same number. Read \code{price_min} / \code{price_max} (annual row) or \code{within_state_sd}
+(monthly rows) as the
 declared distance between the state value and the utilities inside it.
 }
 \examples{
